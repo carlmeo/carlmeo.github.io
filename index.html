@@ -8,6 +8,8 @@
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-app-compat.js"></script>
+<script src="https://www.gstatic.com/firebasejs/10.12.0/firebase-database-compat.js"></script>
 <style>
 *{box-sizing:border-box;margin:0;padding:0;}
 body{background:#08070f;overflow-x:hidden;}
@@ -90,12 +92,6 @@ document.getElementById("pw-input").addEventListener("keydown",e=>{if(e.key==="E
 <script type="text/babel">
 const {useState,useCallback,useMemo,useEffect,useRef}=React;
 
-/* ── CONFIG ── */
-const JSONBIN_ID = null; // Will be set up on first save
-const JSONBIN_API = "https://api.jsonbin.io/v3";
-// For persistence we use localStorage as primary + a simple sharing mechanism
-// Users can export/import state via URL hash or file
-
 const START_YEAR=2026;const END_YEAR=2033;
 const MONTHS=["Jan","Feb","Mar","Apr","Maj","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
 const TOTAL_MONTHS=(END_YEAR-START_YEAR+1)*12;
@@ -161,6 +157,20 @@ const MOODS=[
 ];
 const mood=v=>MOODS.find(m=>v>=m.min)||MOODS[MOODS.length-1];
 
+/* ── FIREBASE SETUP ── */
+const firebaseConfig={
+  apiKey:"AIzaSyAlzpuRyBpyxeGWCu89XYt9d8a_92XZbAM",
+  authDomain:"familjebudget2.firebaseapp.com",
+  databaseURL:"https://familjebudget2-default-rtdb.europe-west1.firebasedatabase.app",
+  projectId:"familjebudget2",
+  storageBucket:"familjebudget2.firebasestorage.app",
+  messagingSenderId:"50672486173",
+  appId:"1:50672486173:web:94ecf4f08fbaae9f7843f4"
+};
+firebase.initializeApp(firebaseConfig);
+const db=firebase.database();
+const stateRef=db.ref("budgetState");
+
 /* ── PERSISTENCE LAYER ── */
 const STORAGE_KEY="familjens_pengakarta_v1";
 
@@ -176,26 +186,14 @@ const DEFAULT_STATE={
   fp1:[],fp2:[],
 };
 
-function loadState(){
-  try{
-    // Check URL hash first (shared link)
-    if(window.location.hash.length>1){
-      try{
-        const decoded=JSON.parse(decodeURIComponent(atob(window.location.hash.slice(1))));
-        // Clear hash after loading
-        history.replaceState(null,"",window.location.pathname);
-        return{...DEFAULT_STATE,...decoded};
-      }catch(e){console.log("Invalid hash state");}
-    }
-    const saved=localStorage.getItem(STORAGE_KEY);
-    if(saved){return{...DEFAULT_STATE,...JSON.parse(saved)};}
-  }catch(e){console.error("Load error:",e);}
-  return DEFAULT_STATE;
+function saveToFirebase(state){
+  stateRef.set(state).catch(e=>console.error("Firebase save error:",e));
 }
 
 function saveState(state){
   try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
-  catch(e){console.error("Save error:",e);}
+  catch(e){console.error("LocalStorage save error:",e);}
+  saveToFirebase(state);
 }
 
 function generateShareLink(state){
@@ -206,35 +204,111 @@ function generateShareLink(state){
 
 /* ── APP ── */
 function App(){
-  const initial=useRef(loadState()).current;
-
-  const[b1on,setB1on]=useState(initial.b1on);
-  const[b1y,setB1y]=useState(initial.b1y);const[b1m,setB1m]=useState(initial.b1m);
-  const[b2on,setB2on]=useState(initial.b2on);
-  const[b2y,setB2y]=useState(initial.b2y);const[b2m,setB2m]=useState(initial.b2m);
-  const[csnPeriods,setCsnPeriods]=useState(initial.csnPeriods);
-  const[atbPeriods,setAtbPeriods]=useState(initial.atbPeriods);
-  const[lon1,setLon1]=useState(initial.lon1);
-  const[lon2,setLon2]=useState(initial.lon2);
-  const[elon,setElon]=useState(initial.elon);
-  const[elsy,setElsy]=useState(initial.elsy);const[elsm,setElsm]=useState(initial.elsm);
-  const[eley,setEley]=useState(initial.eley);const[elem,setElem]=useState(initial.elem);
-  const[pkon,setPkon]=useState(initial.pkon);
-  const[pksy,setPksy]=useState(initial.pksy);const[pksm,setPksm]=useState(initial.pksm);
-  const[pkey,setPkey]=useState(initial.pkey);const[pkem,setPkem]=useState(initial.pkem);
-  const[sem,setSem]=useState(initial.sem);
-  const[privPension,setPrivPension]=useState(initial.privPension);
-  const[sparGem,setSparGem]=useState(initial.sparGem);
-  const[sparB1,setSparB1]=useState(initial.sparB1);
-  const[sparB2,setSparB2]=useState(initial.sparB2);
-  const[fp1,setFp1]=useState(initial.fp1);
-  const[fp2,setFp2]=useState(initial.fp2);
+  const[loaded,setLoaded]=useState(false);
+  const[b1on,setB1on]=useState(DEFAULT_STATE.b1on);
+  const[b1y,setB1y]=useState(DEFAULT_STATE.b1y);const[b1m,setB1m]=useState(DEFAULT_STATE.b1m);
+  const[b2on,setB2on]=useState(DEFAULT_STATE.b2on);
+  const[b2y,setB2y]=useState(DEFAULT_STATE.b2y);const[b2m,setB2m]=useState(DEFAULT_STATE.b2m);
+  const[csnPeriods,setCsnPeriods]=useState(DEFAULT_STATE.csnPeriods);
+  const[atbPeriods,setAtbPeriods]=useState(DEFAULT_STATE.atbPeriods);
+  const[lon1,setLon1]=useState(DEFAULT_STATE.lon1);
+  const[lon2,setLon2]=useState(DEFAULT_STATE.lon2);
+  const[elon,setElon]=useState(DEFAULT_STATE.elon);
+  const[elsy,setElsy]=useState(DEFAULT_STATE.elsy);const[elsm,setElsm]=useState(DEFAULT_STATE.elsm);
+  const[eley,setEley]=useState(DEFAULT_STATE.eley);const[elem,setElem]=useState(DEFAULT_STATE.elem);
+  const[pkon,setPkon]=useState(DEFAULT_STATE.pkon);
+  const[pksy,setPksy]=useState(DEFAULT_STATE.pksy);const[pksm,setPksm]=useState(DEFAULT_STATE.pksm);
+  const[pkey,setPkey]=useState(DEFAULT_STATE.pkey);const[pkem,setPkem]=useState(DEFAULT_STATE.pkem);
+  const[sem,setSem]=useState(DEFAULT_STATE.sem);
+  const[privPension,setPrivPension]=useState(DEFAULT_STATE.privPension);
+  const[sparGem,setSparGem]=useState(DEFAULT_STATE.sparGem);
+  const[sparB1,setSparB1]=useState(DEFAULT_STATE.sparB1);
+  const[sparB2,setSparB2]=useState(DEFAULT_STATE.sparB2);
+  const[fp1,setFp1]=useState(DEFAULT_STATE.fp1);
+  const[fp2,setFp2]=useState(DEFAULT_STATE.fp2);
   const[hover,setHover]=useState(null);
   const[ttxy,setTtxy]=useState({x:0,y:0});
   const[tab,setTab]=useState("tabell");
   const[saveMsg,setSaveMsg]=useState(null);
   const[showShareModal,setShowShareModal]=useState(false);
   const[shareUrl,setShareUrl]=useState("");
+  const[syncStatus,setSyncStatus]=useState("🔄 Laddar...");
+
+  // Track whether we're currently writing to Firebase (to ignore our own updates)
+  const isWriting=useRef(false);
+  const ignoreNextSync=useRef(false);
+
+  // Apply a state snapshot to all setters
+  const applyState=useCallback((s)=>{
+    setB1on(s.b1on??DEFAULT_STATE.b1on);
+    setB1y(s.b1y??DEFAULT_STATE.b1y);setB1m(s.b1m??DEFAULT_STATE.b1m);
+    setB2on(s.b2on??DEFAULT_STATE.b2on);
+    setB2y(s.b2y??DEFAULT_STATE.b2y);setB2m(s.b2m??DEFAULT_STATE.b2m);
+    setCsnPeriods(s.csnPeriods??DEFAULT_STATE.csnPeriods);
+    setAtbPeriods(s.atbPeriods??DEFAULT_STATE.atbPeriods);
+    setLon1(s.lon1??DEFAULT_STATE.lon1);
+    setLon2(s.lon2??DEFAULT_STATE.lon2);
+    setElon(s.elon??DEFAULT_STATE.elon);
+    setElsy(s.elsy??DEFAULT_STATE.elsy);setElsm(s.elsm??DEFAULT_STATE.elsm);
+    setEley(s.eley??DEFAULT_STATE.eley);setElem(s.elem??DEFAULT_STATE.elem);
+    setPkon(s.pkon??DEFAULT_STATE.pkon);
+    setPksy(s.pksy??DEFAULT_STATE.pksy);setPksm(s.pksm??DEFAULT_STATE.pksm);
+    setPkey(s.pkey??DEFAULT_STATE.pkey);setPkem(s.pkem??DEFAULT_STATE.pkem);
+    setSem(s.sem??DEFAULT_STATE.sem);
+    setPrivPension(s.privPension??DEFAULT_STATE.privPension);
+    setSparGem(s.sparGem??DEFAULT_STATE.sparGem);
+    setSparB1(s.sparB1??DEFAULT_STATE.sparB1);
+    setSparB2(s.sparB2??DEFAULT_STATE.sparB2);
+    setFp1(s.fp1??DEFAULT_STATE.fp1);
+    setFp2(s.fp2??DEFAULT_STATE.fp2);
+  },[]);
+
+  // Load initial state from Firebase (with localStorage fallback), then listen for realtime changes
+  useEffect(()=>{
+    // First load
+    stateRef.once("value").then(snap=>{
+      const fbData=snap.val();
+      if(fbData){
+        applyState({...DEFAULT_STATE,...fbData});
+        setSyncStatus("🟢 Synkad");
+      } else {
+        // No Firebase data yet — try localStorage
+        try{
+          const saved=localStorage.getItem(STORAGE_KEY);
+          if(saved){
+            const parsed=JSON.parse(saved);
+            applyState({...DEFAULT_STATE,...parsed});
+            // Push localStorage data to Firebase so partner gets it
+            saveToFirebase({...DEFAULT_STATE,...parsed});
+          }
+        }catch(e){}
+        setSyncStatus("🟢 Synkad");
+      }
+      setLoaded(true);
+    }).catch(e=>{
+      console.error("Firebase load error, falling back to localStorage:",e);
+      try{
+        const saved=localStorage.getItem(STORAGE_KEY);
+        if(saved) applyState({...DEFAULT_STATE,...JSON.parse(saved)});
+      }catch(e2){}
+      setSyncStatus("🟡 Offline");
+      setLoaded(true);
+    });
+
+    // Realtime listener for changes from other users
+    const listener=stateRef.on("value",snap=>{
+      if(ignoreNextSync.current){ignoreNextSync.current=false;return;}
+      const fbData=snap.val();
+      if(fbData&&!isWriting.current){
+        applyState({...DEFAULT_STATE,...fbData});
+        setSyncStatus("🟢 Synkad");
+        setSaveMsg("🔄 Uppdatering från annan enhet!");
+        setTimeout(()=>setSaveMsg(null),2000);
+      }
+    });
+
+    return()=>stateRef.off("value",listener);
+  },[]);
 
   // Auto-save on every state change (debounced)
   const saveTimer=useRef(null);
@@ -244,15 +318,22 @@ function App(){
     sem,privPension,sparGem,sparB1,sparB2,fp1,fp2
   }),[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,sem,privPension,sparGem,sparB1,sparB2,fp1,fp2]);
 
+  // Only save after initial load is complete
+  const firstRender=useRef(true);
   useEffect(()=>{
+    if(!loaded)return;
+    if(firstRender.current){firstRender.current=false;return;}
     if(saveTimer.current)clearTimeout(saveTimer.current);
     saveTimer.current=setTimeout(()=>{
+      isWriting.current=true;
+      ignoreNextSync.current=true;
       saveState(currentState);
-      setSaveMsg("✅ Sparat!");
-      setTimeout(()=>setSaveMsg(null),1500);
+      setSaveMsg("✅ Sparat & synkat!");
+      setSyncStatus("🟢 Synkad");
+      setTimeout(()=>{isWriting.current=false;setSaveMsg(null);},1500);
     },800);
     return()=>{if(saveTimer.current)clearTimeout(saveTimer.current);};
-  },[currentState]);
+  },[currentState,loaded]);
 
   const handleShare=()=>{
     const url=generateShareLink(currentState);
@@ -277,9 +358,9 @@ function App(){
   };
 
   const handleReset=()=>{
-    if(confirm("🧹 Vill du verkligen nollställa allt till standard? Detta går inte att ångra!")){
+    if(confirm("🧹 Vill du verkligen nollställa allt till standard? Detta går inte att ångra!\n\nDetta nollställer för ALLA enheter!")){
       localStorage.removeItem(STORAGE_KEY);
-      window.location.reload();
+      stateRef.set(DEFAULT_STATE).then(()=>window.location.reload()).catch(()=>window.location.reload());
     }
   };
 
@@ -303,7 +384,9 @@ function App(){
           const imported=JSON.parse(ev.target.result);
           const merged={...DEFAULT_STATE,...imported};
           saveState(merged);
-          window.location.reload();
+          applyState(merged);
+          setSaveMsg("📂 Importerat & synkat!");
+          setTimeout(()=>setSaveMsg(null),2000);
         }catch(err){alert("❌ Kunde inte läsa filen: "+err.message);}
       };
       reader.readAsText(file);
@@ -422,8 +505,22 @@ function App(){
   return(
   <div style={{fontFamily:"'Nunito',sans-serif",background:"#08070f",color:"#e0cfff",minHeight:"100vh"}} onMouseMove={onMv}>
 
+    {/* LOADING SCREEN */}
+    {!loaded&&(
+      <div style={{display:"flex",alignItems:"center",justifyContent:"center",minHeight:"100vh",flexDirection:"column",gap:16}}>
+        <div style={{fontSize:"3rem",animation:"float 2s ease-in-out infinite"}}>🏠</div>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.4rem",color:"#f0abfc"}}>Laddar Pengakartan...</div>
+        <div style={{color:"#7766aa",fontSize:"0.82rem"}}>Synkar med Firebase 🔥</div>
+      </div>
+    )}
+
+    {loaded&&<React.Fragment>
+
     {/* SAVE INDICATOR */}
     {saveMsg&&<div className="save-indicator" style={{background:"#160e28",border:"2px solid #c084fc66",color:"#a7f3c0"}}>{saveMsg}</div>}
+
+    {/* SYNC STATUS - fixed bottom left */}
+    <div style={{position:"fixed",bottom:20,left:20,zIndex:10000,background:"#160e28",border:"2px solid #1e1840",borderRadius:12,padding:"6px 14px",fontSize:"0.72rem",color:"#7766aa",fontFamily:"'Nunito',sans-serif"}}>{syncStatus}</div>
 
     {/* SHARE MODAL */}
     {showShareModal&&(
@@ -916,6 +1013,7 @@ function App(){
       </div>
     )}
 
+    </React.Fragment>}
   </div>
   );
 }
