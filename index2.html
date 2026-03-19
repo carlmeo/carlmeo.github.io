@@ -1,0 +1,926 @@
+<!DOCTYPE html>
+<html lang="sv">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Familjens Pengakarta 🏠</title>
+<link href="https://fonts.googleapis.com/css2?family=Nunito:wght@400;600;700;900&family=Fredoka+One&display=swap" rel="stylesheet"/>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+<script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.9/babel.min.js"></script>
+<style>
+*{box-sizing:border-box;margin:0;padding:0;}
+body{background:#08070f;overflow-x:hidden;}
+select option{background:#12102a;}
+::-webkit-scrollbar{width:5px;height:5px;}
+::-webkit-scrollbar-track{background:#0e0d1e;}
+::-webkit-scrollbar-thumb{background:#c084fc44;border-radius:4px;}
+.row{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-bottom:10px;}
+.row label{font-size:0.78rem;color:#9a80cc;}
+@keyframes pop{0%{transform:scale(0.85);opacity:0}100%{transform:scale(1);opacity:1}}
+@keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
+@keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
+@keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+.cell:hover{transform:scale(1.12)!important;}
+.save-indicator{position:fixed;bottom:20px;right:20px;z-index:10000;font-family:'Nunito',sans-serif;font-size:0.82rem;padding:10px 20px;border-radius:14px;pointer-events:none;transition:all 0.4s ease;}
+#login-gate{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Nunito',sans-serif;}
+#login-gate .box{background:#160e28;border:2px solid #c084fc66;border-radius:22px;padding:36px 40px;max-width:380px;width:90%;box-shadow:0 12px 60px #c084fc33;text-align:center;}
+#login-gate h2{font-family:'Fredoka One',cursive;font-size:2rem;background:linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+#login-gate p{color:#7766aa;font-size:0.82rem;margin-bottom:20px;}
+#login-gate input{background:#12102a;border:2px solid #c084fc44;color:#e0cfff;font-family:'Nunito',sans-serif;font-size:1rem;padding:10px 16px;border-radius:12px;outline:none;width:100%;margin-bottom:12px;text-align:center;}
+#login-gate input:focus{border-color:#c084fc;}
+#login-gate button{padding:10px 28px;border-radius:16px;border:none;cursor:pointer;font-family:'Fredoka One',cursive;font-size:1rem;background:linear-gradient(135deg,#c084fc,#f472b6);color:#fff;box-shadow:0 4px 20px #c084fc55;width:100%;transition:transform 0.15s;}
+#login-gate button:hover{transform:scale(1.03);}
+#login-gate .error{color:#fca5a5;font-size:0.78rem;margin-top:8px;}
+#app-content{display:none;}
+</style>
+</head>
+<body>
+
+<!-- PASSWORD GATE -->
+<div id="login-gate">
+  <div class="box">
+    <div style="font-size:3rem;margin-bottom:10px;animation:float 3s ease-in-out infinite">🔒</div>
+    <h2>Familjens Pengakarta</h2>
+    <p>Skriv lösenordet för att komma in!</p>
+    <input type="password" id="pw-input" placeholder="Lösenord..." autofocus/>
+    <button onclick="tryLogin()">Lås upp 🔑</button>
+    <div id="pw-error" class="error"></div>
+  </div>
+</div>
+
+<div id="app-content">
+  <div id="root"></div>
+</div>
+
+<script>
+const HASH="48dca0ec213ea0e913a2882e54654c98916332cbfb58815e29c8f12fea2229a1";
+const SESSION_KEY="pengakarta_auth";
+
+async function sha256(msg){
+  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+async function tryLogin(){
+  const pw=document.getElementById("pw-input").value;
+  const h=await sha256(pw);
+  if(h===HASH){
+    sessionStorage.setItem(SESSION_KEY,"1");
+    unlock();
+  } else {
+    document.getElementById("pw-error").textContent="❌ Fel lösenord – försök igen!";
+    document.getElementById("pw-input").value="";
+    document.getElementById("pw-input").focus();
+  }
+}
+
+function unlock(){
+  document.getElementById("login-gate").style.display="none";
+  document.getElementById("app-content").style.display="block";
+}
+
+// Auto-unlock if already authenticated this session
+if(sessionStorage.getItem(SESSION_KEY)==="1") unlock();
+
+// Enter key to submit
+document.getElementById("pw-input").addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+</script>
+
+<script type="text/babel">
+const {useState,useCallback,useMemo,useEffect,useRef}=React;
+
+/* ── CONFIG ── */
+const JSONBIN_ID = null; // Will be set up on first save
+const JSONBIN_API = "https://api.jsonbin.io/v3";
+// For persistence we use localStorage as primary + a simple sharing mechanism
+// Users can export/import state via URL hash or file
+
+const START_YEAR=2026;const END_YEAR=2033;
+const MONTHS=["Jan","Feb","Mar","Apr","Maj","Jun","Jul","Aug","Sep","Okt","Nov","Dec"];
+const TOTAL_MONTHS=(END_YEAR-START_YEAR+1)*12;
+
+const LOPANDE=[
+  {id:"v1_mat",src:"Vuxen 1",typ:"🍕 Mat & livsmedel",barn:null,costs:[3730,3730,3730,3730,3730,3730,3730,3730]},
+  {id:"v2_mat",src:"Vuxen 2",typ:"🍕 Mat & livsmedel",barn:null,costs:[3730,3730,3730,3730,3730,3730,3730,3730]},
+  {id:"b1_mat",src:"Barn 1",typ:"🍕 Mat & livsmedel",barn:1,costs:[1050,1210,1610,1610,1610,1610,2390,2390]},
+  {id:"b2_mat",src:"Barn 2",typ:"🍕 Mat & livsmedel",barn:2,costs:[1050,1210,1610,1610,1610,1610,2390,2390]},
+  {id:"v1_ind",src:"Vuxen 1",typ:"🛍️ Personligt",barn:null,costs:[2090,2090,2090,2090,2090,2090,2090,2090]},
+  {id:"v2_ind",src:"Vuxen 2",typ:"🛍️ Personligt",barn:null,costs:[2090,2090,2090,2090,2090,2090,2090,2090]},
+  {id:"b1_ind",src:"Barn 1",typ:"🛍️ Personligt",barn:1,costs:[2870,2670,2670,2670,1960,1960,1960,2020]},
+  {id:"b2_ind",src:"Barn 2",typ:"🛍️ Personligt",barn:2,costs:[2870,2670,2670,2670,1960,1960,1960,2020]},
+  {id:"b1_barnbidrag",src:"Barn 1",typ:"🛍️ Personligt",barn:1,costs:[-1250,-1250,-1250,-1250,-1250,-1250,-1250,-1250]},
+  {id:"b2_barnbidrag",src:"Barn 2",typ:"🛍️ Personligt",barn:2,costs:[-1250,-1250,-1250,-1250,-1250,-1250,-1250,-1250]},
+  {id:"b2_xbarnbidrag",src:"Barn 2",typ:"🛍️ Personligt",barn:2,costs:[-150,-150,-150,-150,-150,-150,-150,-150]},
+  {id:"v1_forbruk",src:"Vuxen 1",typ:"🏠 Hushåll",barn:null,costs:[100,100,100,100,100,100,100,100]},
+  {id:"v2_forbruk",src:"Vuxen 2",typ:"🏠 Hushåll",barn:null,costs:[100,100,100,100,100,100,100,100]},
+  {id:"b1_forbruk",src:"Barn 1",typ:"🏠 Hushåll",barn:1,costs:[100,100,100,100,100,100,100,100]},
+  {id:"b2_forbruk",src:"Barn 2",typ:"🏠 Hushåll",barn:2,costs:[60,60,60,60,60,60,60,60]},
+  {id:"b1_hemutrust",src:"Barn 1",typ:"🏠 Hushåll",barn:1,costs:[1310,1310,1310,1310,1310,1310,1310,1310]},
+  {id:"b2_hemutrust",src:"Barn 2",typ:"🏠 Hushåll",barn:2,costs:[260,260,260,260,260,260,260,260]},
+  {id:"v1_internet",src:"Vuxen 1",typ:"🏠 Hushåll",barn:null,costs:[225,225,225,225,225,225,225,225]},
+  {id:"v2_internet",src:"Vuxen 2",typ:"🏠 Hushåll",barn:null,costs:[225,225,225,225,225,225,225,225]},
+  {id:"b1_internet",src:"Barn 1",typ:"🏠 Hushåll",barn:1,costs:[0,0,585,585,585,585,585,585]},
+  {id:"b2_internet",src:"Barn 2",typ:"🏠 Hushåll",barn:2,costs:[0,0,585,585,585,585,585,585]},
+  {id:"v1_media",src:"Vuxen 1",typ:"🏠 Hushåll",barn:null,costs:[340,340,340,340,340,340,340,340]},
+  {id:"v2_media",src:"Vuxen 2",typ:"🏠 Hushåll",barn:null,costs:[340,340,340,340,340,340,340,340]},
+  {id:"b1_media",src:"Barn 1",typ:"🏠 Hushåll",barn:1,costs:[0,30,30,30,30,30,30,30]},
+  {id:"b2_media",src:"Barn 2",typ:"🏠 Hushåll",barn:2,costs:[0,30,30,30,30,30,30,30]},
+  {id:"f_semester",src:"Familj",typ:"✈️ Semester",barn:null,adjustable:true,costs:[1667,1667,1667,1667,1667,1667,1667,1667]},
+  {id:"v1_periodkort",src:"Vuxen 1",typ:"🚌 Kollektivtrafik",barn:null,isPeriodkort:true,costs:[2100,2100,2100,2100,2100,2100,2100,2100]},
+  {id:"v1_periodkort_aterbet",src:"Vuxen 1",typ:"🚌 Kollektivtrafik",barn:null,isPeriodkort:true,costs:[-1000,-1000,-1000,-1000,-1000,-1000,-1000,-1000]},
+  {id:"v1_koll_ovr",src:"Vuxen 1",typ:"🚌 Kollektivtrafik",barn:null,costs:[300,300,300,300,300,300,300,300]},
+  {id:"v2_koll_ovr",src:"Vuxen 2",typ:"🚌 Kollektivtrafik",barn:null,costs:[300,300,300,300,300,300,300,300]},
+  {id:"b1_koll",src:"Barn 1",typ:"🚌 Kollektivtrafik",barn:1,costs:[0,0,100,100,100,100,200,200]},
+  {id:"b2_koll",src:"Barn 2",typ:"🚌 Kollektivtrafik",barn:2,costs:[0,0,100,100,100,100,200,200]},
+  {id:"f_laddning",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[667,667,667,667,667,667,667,667]},
+  {id:"f_elbilforsakr",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[500,500,500,500,500,500,500,500]},
+  {id:"f_service",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[333,333,333,333,333,333,333,333]},
+  {id:"f_dack",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[167,167,167,167,167,167,167,167]},
+  {id:"f_rep",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[167,167,167,167,167,167,167,167]},
+  {id:"f_besiktning",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[50,50,50,50,50,50,50,50]},
+  {id:"f_vagskatt",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[0,0,0,0,0,0,0,0]},
+  {id:"f_parkering",src:"Familj",typ:"🚗 Elbil",barn:null,isElbil:true,costs:[1600,1600,1600,1600,1600,1600,1600,1600]},
+  {id:"f_hyra",src:"Familj",typ:"🏡 Boende",barn:null,costs:[17000,17255,17514,17777,18043,18314,18589,18867]},
+  {id:"f_el",src:"Familj",typ:"🏡 Boende",barn:null,costs:[900,900,900,900,900,900,900,900]},
+  {id:"f_elnat",src:"Familj",typ:"🏡 Boende",barn:null,costs:[105,105,105,105,105,105,105,105]},
+  {id:"f_forsakr",src:"Familj",typ:"🏡 Boende",barn:null,costs:[300,300,300,300,300,300,300,300]},
+];
+
+function dIdx(y,m){return(y-START_YEAR)*12+(m-1);}
+function idxYM(i){return{year:START_YEAR+Math.floor(i/12),month:(i%12)+1};}
+function fmt(n){return Math.round(n).toLocaleString("sv-SE")+" kr";}
+
+const MOODS=[
+  {min:15000,emoji:"🤑",label:"Rikt som ett troll!",bg:"#052515",border:"#0a5c2a",text:"#4ade80"},
+  {min:8000,emoji:"😄",label:"Lugnt och skönt!",bg:"#062018",border:"#0d7a3a",text:"#86efac"},
+  {min:3000,emoji:"🙂",label:"Hyggligt!",bg:"#082018",border:"#156030",text:"#a7f3c0"},
+  {min:0,emoji:"😬",label:"Håller sig...",bg:"#261a06",border:"#7c5c10",text:"#fcd34d"},
+  {min:-5000,emoji:"😰",label:"Lite nervöst nu!",bg:"#2e1208",border:"#a03010",text:"#fb923c"},
+  {min:-Infinity,emoji:"🔥",label:"Brand i kassan!",bg:"#300614",border:"#b01030",text:"#fca5a5"},
+];
+const mood=v=>MOODS.find(m=>v>=m.min)||MOODS[MOODS.length-1];
+
+/* ── PERSISTENCE LAYER ── */
+const STORAGE_KEY="familjens_pengakarta_v1";
+
+const DEFAULT_STATE={
+  b1on:false,b1y:2026,b1m:6,
+  b2on:false,b2y:2027,b2m:6,
+  csnPeriods:[],atbPeriods:[],
+  lon1:[{id:1,sy:2026,sm:1,ey:2033,em:12,dagar:5}],
+  lon2:[{id:2,sy:2026,sm:1,ey:2033,em:12,dagar:5}],
+  elon:true,elsy:2026,elsm:1,eley:2033,elem:12,
+  pkon:true,pksy:2026,pksm:1,pkey:2033,pkem:12,
+  sem:1667,privPension:500,sparGem:1000,sparB1:500,sparB2:500,
+  fp1:[],fp2:[],
+};
+
+function loadState(){
+  try{
+    // Check URL hash first (shared link)
+    if(window.location.hash.length>1){
+      try{
+        const decoded=JSON.parse(decodeURIComponent(atob(window.location.hash.slice(1))));
+        // Clear hash after loading
+        history.replaceState(null,"",window.location.pathname);
+        return{...DEFAULT_STATE,...decoded};
+      }catch(e){console.log("Invalid hash state");}
+    }
+    const saved=localStorage.getItem(STORAGE_KEY);
+    if(saved){return{...DEFAULT_STATE,...JSON.parse(saved)};}
+  }catch(e){console.error("Load error:",e);}
+  return DEFAULT_STATE;
+}
+
+function saveState(state){
+  try{localStorage.setItem(STORAGE_KEY,JSON.stringify(state));}
+  catch(e){console.error("Save error:",e);}
+}
+
+function generateShareLink(state){
+  const json=JSON.stringify(state);
+  const encoded=btoa(encodeURIComponent(json));
+  return window.location.origin+window.location.pathname+"#"+encoded;
+}
+
+/* ── APP ── */
+function App(){
+  const initial=useRef(loadState()).current;
+
+  const[b1on,setB1on]=useState(initial.b1on);
+  const[b1y,setB1y]=useState(initial.b1y);const[b1m,setB1m]=useState(initial.b1m);
+  const[b2on,setB2on]=useState(initial.b2on);
+  const[b2y,setB2y]=useState(initial.b2y);const[b2m,setB2m]=useState(initial.b2m);
+  const[csnPeriods,setCsnPeriods]=useState(initial.csnPeriods);
+  const[atbPeriods,setAtbPeriods]=useState(initial.atbPeriods);
+  const[lon1,setLon1]=useState(initial.lon1);
+  const[lon2,setLon2]=useState(initial.lon2);
+  const[elon,setElon]=useState(initial.elon);
+  const[elsy,setElsy]=useState(initial.elsy);const[elsm,setElsm]=useState(initial.elsm);
+  const[eley,setEley]=useState(initial.eley);const[elem,setElem]=useState(initial.elem);
+  const[pkon,setPkon]=useState(initial.pkon);
+  const[pksy,setPksy]=useState(initial.pksy);const[pksm,setPksm]=useState(initial.pksm);
+  const[pkey,setPkey]=useState(initial.pkey);const[pkem,setPkem]=useState(initial.pkem);
+  const[sem,setSem]=useState(initial.sem);
+  const[privPension,setPrivPension]=useState(initial.privPension);
+  const[sparGem,setSparGem]=useState(initial.sparGem);
+  const[sparB1,setSparB1]=useState(initial.sparB1);
+  const[sparB2,setSparB2]=useState(initial.sparB2);
+  const[fp1,setFp1]=useState(initial.fp1);
+  const[fp2,setFp2]=useState(initial.fp2);
+  const[hover,setHover]=useState(null);
+  const[ttxy,setTtxy]=useState({x:0,y:0});
+  const[tab,setTab]=useState("tabell");
+  const[saveMsg,setSaveMsg]=useState(null);
+  const[showShareModal,setShowShareModal]=useState(false);
+  const[shareUrl,setShareUrl]=useState("");
+
+  // Auto-save on every state change (debounced)
+  const saveTimer=useRef(null);
+  const currentState=useMemo(()=>({
+    b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,
+    lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,
+    sem,privPension,sparGem,sparB1,sparB2,fp1,fp2
+  }),[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,sem,privPension,sparGem,sparB1,sparB2,fp1,fp2]);
+
+  useEffect(()=>{
+    if(saveTimer.current)clearTimeout(saveTimer.current);
+    saveTimer.current=setTimeout(()=>{
+      saveState(currentState);
+      setSaveMsg("✅ Sparat!");
+      setTimeout(()=>setSaveMsg(null),1500);
+    },800);
+    return()=>{if(saveTimer.current)clearTimeout(saveTimer.current);};
+  },[currentState]);
+
+  const handleShare=()=>{
+    const url=generateShareLink(currentState);
+    setShareUrl(url);
+    setShowShareModal(true);
+  };
+
+  const copyShareLink=()=>{
+    navigator.clipboard.writeText(shareUrl).then(()=>{
+      setSaveMsg("📋 Länk kopierad!");
+      setTimeout(()=>setSaveMsg(null),2000);
+      setShowShareModal(false);
+    }).catch(()=>{
+      // Fallback
+      const ta=document.createElement("textarea");
+      ta.value=shareUrl;document.body.appendChild(ta);ta.select();
+      document.execCommand("copy");document.body.removeChild(ta);
+      setSaveMsg("📋 Länk kopierad!");
+      setTimeout(()=>setSaveMsg(null),2000);
+      setShowShareModal(false);
+    });
+  };
+
+  const handleReset=()=>{
+    if(confirm("🧹 Vill du verkligen nollställa allt till standard? Detta går inte att ångra!")){
+      localStorage.removeItem(STORAGE_KEY);
+      window.location.reload();
+    }
+  };
+
+  const handleExport=()=>{
+    const blob=new Blob([JSON.stringify(currentState,null,2)],{type:"application/json"});
+    const url=URL.createObjectURL(blob);
+    const a=document.createElement("a");
+    a.href=url;a.download="pengakarta-backup.json";a.click();
+    URL.revokeObjectURL(url);
+    setSaveMsg("💾 Exporterat!");setTimeout(()=>setSaveMsg(null),2000);
+  };
+
+  const handleImport=()=>{
+    const input=document.createElement("input");
+    input.type="file";input.accept=".json";
+    input.onchange=e=>{
+      const file=e.target.files[0];if(!file)return;
+      const reader=new FileReader();
+      reader.onload=ev=>{
+        try{
+          const imported=JSON.parse(ev.target.result);
+          const merged={...DEFAULT_STATE,...imported};
+          saveState(merged);
+          window.location.reload();
+        }catch(err){alert("❌ Kunde inte läsa filen: "+err.message);}
+      };
+      reader.readAsText(file);
+    };
+    input.click();
+  };
+
+  const addFp=n=>{const p={id:Date.now(),sy:2026,sm:1,ey:2026,em:6,v1d:5,v2d:0};n===1?setFp1(x=>[...x,p]):setFp2(x=>[...x,p]);};
+  const rmFp=(n,id)=>n===1?setFp1(x=>x.filter(p=>p.id!==id)):setFp2(x=>x.filter(p=>p.id!==id));
+  const upFp=(n,id,f,v)=>{const u=a=>a.map(p=>p.id===id?{...p,[f]:v}:p);n===1?setFp1(u):setFp2(u);};
+
+  const addLon=n=>{const p={id:Date.now(),sy:2026,sm:1,ey:2033,em:12,dagar:5};n===1?setLon1(x=>[...x,p]):setLon2(x=>[...x,p]);};
+  const rmLon=(n,id)=>n===1?setLon1(x=>x.filter(p=>p.id!==id)):setLon2(x=>x.filter(p=>p.id!==id));
+  const upLon=(n,id,f,v)=>{const u=a=>a.map(p=>p.id===id?{...p,[f]:v}:p);n===1?setLon1(u):setLon2(u);};
+
+  const addCsn=()=>setCsnPeriods(x=>[...x,{id:Date.now(),sy:2026,sm:1,ey:2027,em:12}]);
+  const rmCsn=id=>setCsnPeriods(x=>x.filter(p=>p.id!==id));
+  const upCsn=(id,f,v)=>setCsnPeriods(a=>a.map(p=>p.id===id?{...p,[f]:v}:p));
+
+  const addAtb=()=>setAtbPeriods(x=>[...x,{id:Date.now(),sy:2026,sm:1,ey:2027,em:12,belopp:750}]);
+  const rmAtb=id=>setAtbPeriods(x=>x.filter(p=>p.id!==id));
+  const upAtb=(id,f,v)=>setAtbPeriods(a=>a.map(p=>p.id===id?{...p,[f]:v}:p));
+
+  const data=useMemo(()=>{
+    const b1s=b1on?dIdx(b1y,b1m):-1,b2s=b2on?dIdx(b2y,b2m):-1;
+    const els=elon?dIdx(elsy,elsm):-1,ele=elon?dIdx(eley,elem):-1;
+    const pks=pkon?dIdx(pksy,pksm):-1,pke=pkon?dIdx(pkey,pkem):-1;
+    const csnArr=new Array(TOTAL_MONTHS).fill(0);
+    csnPeriods.forEach(p=>{
+      const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+      for(let i=s;i<=e&&i<TOTAL_MONTHS;i++){
+        const csnBase=4092+9408+4656;
+        const tillagg=(b1on&&i>=b1s?780:0)+(b2on&&i>=b2s?496:0);
+        csnArr[i]+=csnBase+tillagg;
+      }
+    });
+    const atbArr=new Array(TOTAL_MONTHS).fill(0);
+    atbPeriods.forEach(p=>{
+      const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+      for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)atbArr[i]+=(p.belopp||0);
+    });
+    const sv1=new Array(TOTAL_MONTHS).fill(0),sv2=new Array(TOTAL_MONTHS).fill(0);
+    lon1.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv1[i]+=34219*(p.dagar/5);});
+    lon2.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv2[i]+=38269*(p.dagar/5);});
+    const fv1=new Array(TOTAL_MONTHS).fill(0),fv2=new Array(TOTAL_MONTHS).fill(0);
+    [[fp1,b1s],[fp2,b2s]].forEach(([ps,bs])=>{
+      if(bs===-1)return;
+      ps.forEach(p=>{
+        const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+        for(let i=s;i<=e&&i<TOTAL_MONTHS;i++){fv1[i]+=(p.v1d||0)*4.33*747;fv2[i]+=(p.v2d||0)*4.33*844;}
+      });
+    });
+    return Array.from({length:TOTAL_MONTHS},(_,mi)=>{
+      const{year,month}=idxYM(mi);const yi=year-START_YEAR;
+      const gi={},gc1={},gc2={},gsh={};
+      const addI=(k,v)=>{gi[k]=(gi[k]||0)+v;};
+      const addC1=(k,v)=>{gc1[k]=(gc1[k]||0)+v;};
+      const addC2=(k,v)=>{gc2[k]=(gc2[k]||0)+v;};
+      const addSh=(k,v)=>{gsh[k]=(gsh[k]||0)+v;};
+      let v1i=0,v2i=0;
+      if(sv1[mi]>0){v1i+=sv1[mi];addI("💼 Lön (V1)",sv1[mi]);}
+      if(sv2[mi]>0){v2i+=sv2[mi];addI("💼 Lön (V2)",sv2[mi]);}
+      if(csnArr[mi]>0){addI("🎓 CSN-bidrag & lån (V1)",csnArr[mi]);v1i+=csnArr[mi];}
+      if(atbArr[mi]>0){addC1("🎓 CSN-återbetalning (V1)",atbArr[mi]);v1i-=atbArr[mi];}
+      if(fv1[mi]>0){v1i+=fv1[mi];addI("👶 Föräldrapenning (V1)",fv1[mi]);}
+      if(fv2[mi]>0){v2i+=fv2[mi];addI("👶 Föräldrapenning (V2)",fv2[mi]);}
+      let v1c=0,v2c=0,sh=0;
+      LOPANDE.forEach(item=>{
+        if(item.barn===1&&(!b1on||mi<b1s))return;
+        if(item.barn===2&&(!b2on||mi<b2s))return;
+        if(item.isElbil&&(els===-1||mi<els||mi>ele))return;
+        if(item.isPeriodkort&&(pks===-1||mi<pks||mi>pke))return;
+        const raw=item.adjustable?0:(item.costs[yi]||0);
+        if(raw===0)return;
+        if(item.src==="Vuxen 1"){v1c+=raw;addC1(item.typ,raw);}
+        else if(item.src==="Vuxen 2"){v2c+=raw;addC2(item.typ,raw);}
+        else{sh+=raw;addSh(item.typ,raw);}
+      });
+      if(sem>0){sh+=sem;addSh("✈️ Semester",sem);}
+      const fpActiveThisMonth=fv1[mi]>0||fv2[mi]>0;
+      if(fpActiveThisMonth&&privPension>0){sh+=privPension;addSh("🏦 Privat pension (FL)",privPension);}
+      if(sparGem>0){sh+=sparGem;addSh("💰 Gemensamt sparande",sparGem);}
+      if(b1on&&mi>=b1s&&sparB1>0){sh+=sparB1;addSh("🐣 Sparande Barn 1",sparB1);}
+      if(b2on&&mi>=b2s&&sparB2>0){sh+=sparB2;addSh("🐥 Sparande Barn 2",sparB2);}
+      const totalI=v1i+v2i;
+      const v1share=totalI>0?v1i/totalI:0.5;
+      const v2share=totalI>0?v2i/totalI:0.5;
+      const v1sh=sh*v1share;const v2sh=sh*v2share;
+      return{year,month,mi,gi,gc1,gc2,gsh,v1i,v2i,sh,v1share,v2share,v1c,v2c,v1f:v1i-v1c-v1sh,v2f:v2i-v2c-v2sh,get tot(){return this.v1f+this.v2f;}};
+    });
+  },[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,fp1,fp2,sem,privPension,sparGem,sparB1,sparB2]);
+
+  const byYear=useMemo(()=>{const g={};data.forEach(d=>{if(!g[d.year])g[d.year]=[];g[d.year].push(d);});return g;},[data]);
+
+  const onEnt=useCallback((cell,e)=>{setHover(cell);setTtxy({x:e.clientX,y:e.clientY});},[]);
+  const onLv=useCallback(()=>setHover(null),[]);
+  const onMv=useCallback(e=>{if(hover)setTtxy({x:e.clientX,y:e.clientY});},[hover]);
+
+  const ss={background:"#12102a",border:"2px solid #c084fc44",color:"#e0cfff",fontFamily:"'Nunito',sans-serif",fontSize:"0.8rem",padding:"4px 8px",borderRadius:8,outline:"none",cursor:"pointer"};
+  const ins={...ss,width:95};
+  const YM=({y,m,oy,om})=>(
+    <span style={{display:"inline-flex",gap:4,alignItems:"center"}}>
+      <select value={y} onChange={e=>oy(+e.target.value)} style={ss}>{Array.from({length:8},(_,i)=>START_YEAR+i).map(yr=><option key={yr} value={yr}>{yr}</option>)}</select>
+      <select value={m} onChange={e=>om(+e.target.value)} style={ss}>{MONTHS.map((mn,i)=><option key={i+1} value={i+1}>{mn}</option>)}</select>
+    </span>
+  );
+  const Card=({on,children})=>(<div style={{background:on?"#160e28":"#0e0d1e",border:"2px solid "+(on?"#c084fc66":"#252040"),borderRadius:18,padding:"16px 20px",marginBottom:16,boxShadow:on?"0 0 24px #c084fc1a":"none",transition:"all 0.3s"}}>{children}</div>);
+  const Pill=({on,onClick,label,emoji})=>(
+    <button onClick={onClick} style={{padding:"7px 18px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.95rem",background:on?"linear-gradient(135deg,#c084fc,#f472b6)":"#1a1930",color:on?"#fff":"#6655aa",boxShadow:on?"0 0 16px #c084fc66":"none",transition:"all 0.25s",marginRight:8,marginBottom:8}}>
+      {emoji} {label} {on?"✓":""}
+    </button>
+  );
+
+  const tabStyle=active=>({background:active?"linear-gradient(135deg,#c084fc,#f472b6)":"transparent",border:active?"none":"2px solid #2a2050",color:active?"#fff":"#7766aa",fontFamily:"'Fredoka One',cursive",fontSize:"1rem",padding:"9px 22px",borderRadius:22,cursor:"pointer",letterSpacing:"0.03em",boxShadow:active?"0 4px 20px #c084fc55":"none",transition:"all 0.2s"});
+
+  return(
+  <div style={{fontFamily:"'Nunito',sans-serif",background:"#08070f",color:"#e0cfff",minHeight:"100vh"}} onMouseMove={onMv}>
+
+    {/* SAVE INDICATOR */}
+    {saveMsg&&<div className="save-indicator" style={{background:"#160e28",border:"2px solid #c084fc66",color:"#a7f3c0"}}>{saveMsg}</div>}
+
+    {/* SHARE MODAL */}
+    {showShareModal&&(
+      <div style={{position:"fixed",inset:0,background:"#000000aa",zIndex:10001,display:"flex",alignItems:"center",justifyContent:"center"}} onClick={()=>setShowShareModal(false)}>
+        <div onClick={e=>e.stopPropagation()} style={{background:"#160e28",border:"2px solid #c084fc66",borderRadius:22,padding:"28px 32px",maxWidth:520,width:"90%",boxShadow:"0 12px 60px #c084fcaa"}}>
+          <h3 style={{fontFamily:"'Fredoka One',cursive",color:"#f0abfc",fontSize:"1.4rem",marginBottom:14}}>🔗 Dela din Pengakarta</h3>
+          <p style={{color:"#9a80cc",fontSize:"0.82rem",marginBottom:16,lineHeight:1.6}}>
+            Kopiera länken nedan och skicka till den du vill dela med. Länken innehåller alla dina nuvarande inställningar!
+          </p>
+          <div style={{background:"#0d0b20",border:"2px solid #c084fc33",borderRadius:12,padding:"12px 16px",marginBottom:16,wordBreak:"break-all",fontSize:"0.72rem",color:"#c4b5fd",maxHeight:120,overflow:"auto"}}>
+            {shareUrl}
+          </div>
+          <div style={{display:"flex",gap:10}}>
+            <button onClick={copyShareLink} style={{flex:1,padding:"10px 20px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"1rem",background:"linear-gradient(135deg,#c084fc,#f472b6)",color:"#fff",boxShadow:"0 4px 20px #c084fc55"}}>
+              📋 Kopiera länk
+            </button>
+            <button onClick={()=>setShowShareModal(false)} style={{padding:"10px 20px",borderRadius:16,border:"2px solid #2a2050",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"1rem",background:"transparent",color:"#7766aa"}}>
+              Stäng
+            </button>
+          </div>
+        </div>
+      </div>
+    )}
+
+    {/* HEADER */}
+    <div style={{padding:"28px 32px 18px",background:"linear-gradient(180deg,#140e28 0%,#08070f 100%)",borderBottom:"2px solid #1e1840"}}>
+      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18,flexWrap:"wrap"}}>
+        <span style={{fontSize:"3rem",animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🏠</span>
+        <div style={{flex:1}}>
+          <h1 style={{fontFamily:"'Fredoka One',cursive",fontSize:"2.6rem",background:"linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"0.02em"}}>Familjens Pengakarta!</h1>
+          <div style={{color:"#7766aa",fontSize:"0.82rem",marginTop:2}}>2026 → 2033 · Utforska, klicka, och ha kul! 🎉</div>
+        </div>
+        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={handleShare} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Dela med andra">🔗 Dela</button>
+          <button onClick={handleExport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Ladda ner backup">💾 Exportera</button>
+          <button onClick={handleImport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Importera backup">📂 Importera</button>
+          <button onClick={handleReset} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #f472b644",background:"#1a0a12",color:"#f472b6",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Nollställ allt">🧹 Nollställ</button>
+        </div>
+      </div>
+      <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
+        {[["tabell","📊 Månadskartan"],["inkomster","💸 Pengar in"],["utgifter","🛒 Pengar ut"],["fp","🍼 Föräldrapenning"]].map(([k,v])=>(
+          <button key={k} style={tabStyle(tab===k)} onClick={()=>setTab(k)}>{v}</button>
+        ))}
+      </div>
+    </div>
+
+    <div style={{padding:"26px 32px"}}>
+
+    {/* ── PENGAR IN ── */}
+    {tab==="inkomster"&&(
+      <div>
+        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>💸 Pengar som ramlar in</h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+          {[{n:1,lon:lon1,addL:()=>addLon(1),rmL:(id)=>rmLon(1,id),upL:(id,f,v)=>upLon(1,id,f,v),heltid:"34 219",pension:"9 485"},
+            {n:2,lon:lon2,addL:()=>addLon(2),rmL:(id)=>rmLon(2,id),upL:(id,f,v)=>upLon(2,id,f,v),heltid:"38 269",pension:"11 505"}
+          ].map(({n,lon,addL,rmL,upL,heltid,pension})=>(
+            <Card key={n} on={lon.length>0}>
+              <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:12}}>
+                🧑 Vuxen {n} – Lön
+              </div>
+              <button onClick={addL} style={{padding:"6px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",background:"linear-gradient(135deg,#c084fc,#f472b6)",color:"#fff",boxShadow:"0 3px 12px #c084fc44",marginBottom:12}}>
+                + Ny lönperiod ✨
+              </button>
+              {lon.length===0&&<div style={{fontSize:"0.78rem",color:"#5544aa"}}>Inga perioder – ingen lön! 💸</div>}
+              {lon.map((p,i)=>{
+                const dagslon=n===1?34219:38269;
+                const manadsinkomst=Math.round(dagslon*(p.dagar/5));
+                return(
+                  <div key={p.id} style={{background:"#0d0b20",border:"2px solid #c084fc33",borderRadius:14,padding:"12px 16px",marginBottom:10}}>
+                    <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                      <span style={{fontFamily:"'Fredoka One',cursive",color:"#c084fc",fontSize:"0.88rem"}}>📅 Period {i+1}</span>
+                      {lon.length>1&&<button onClick={()=>rmL(p.id)} style={{background:"#f472b622",border:"1px solid #f472b655",color:"#f472b6",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:"0.74rem"}}>Ta bort 🗑️</button>}
+                    </div>
+                    <div className="row"><label>Från:</label><YM y={p.sy} m={p.sm} oy={v=>upL(p.id,"sy",v)} om={v=>upL(p.id,"sm",v)}/></div>
+                    <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upL(p.id,"ey",v)} om={v=>upL(p.id,"em",v)}/></div>
+                    <div className="row">
+                      <label>Arbetsdagar/vecka:</label>
+                      <select value={p.dagar} onChange={e=>upL(p.id,"dagar",+e.target.value)} style={ss}>
+                        {[1,2,3,4,5].map(d=><option key={d} value={d}>{d} dag{d>1?"ar":""}</option>)}
+                      </select>
+                    </div>
+                    <div style={{fontSize:"0.72rem",color:"#9a80cc",background:"#ffffff06",borderRadius:8,padding:"5px 8px",marginTop:2}}>
+                      ≈ <b style={{color:"#a7f3c0"}}>{manadsinkomst.toLocaleString("sv-SE")} kr/mån</b>
+                      {p.dagar<5&&<span style={{color:"#fbbf24"}}> ({p.dagar}/5 av heltid)</span>}
+                    </div>
+                  </div>
+                );
+              })}
+              <div style={{background:"#ffffff05",borderRadius:10,padding:"7px 10px",fontSize:"0.72rem",color:"#7766aa",marginTop:4}}>
+                💼 Heltidslön: {heltid} kr/mån · 🔒 Pension: {pension} kr/mån (separat)
+              </div>
+            </Card>
+          ))}
+
+          <Card on={csnPeriods.length>0||atbPeriods.length>0}>
+            <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:12}}>🎓 CSN – Vuxen 1</div>
+            <div style={{marginBottom:14}}>
+              <div style={{fontFamily:"'Fredoka One',cursive",color:"#c084fc",fontSize:"0.92rem",marginBottom:8}}>📚 CSN-inkomstperioder</div>
+              <button onClick={addCsn} style={{padding:"6px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",background:"linear-gradient(135deg,#c084fc,#f472b6)",color:"#fff",boxShadow:"0 3px 12px #c084fc44",marginBottom:10}}>
+                + Ny CSN-period ✨
+              </button>
+              {csnPeriods.length===0&&<div style={{fontSize:"0.74rem",color:"#5544aa",marginBottom:6}}>Inga CSN-perioder aktiva.</div>}
+              {csnPeriods.map((p,i)=>(
+                <div key={p.id} style={{background:"#0d0b20",border:"2px solid #c084fc33",borderRadius:14,padding:"12px 16px",marginBottom:10}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontFamily:"'Fredoka One',cursive",color:"#c084fc",fontSize:"0.88rem"}}>📅 Period {i+1}</span>
+                    <button onClick={()=>rmCsn(p.id)} style={{background:"#f472b622",border:"1px solid #f472b655",color:"#f472b6",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:"0.74rem"}}>Ta bort 🗑️</button>
+                  </div>
+                  <div className="row"><label>Från:</label><YM y={p.sy} m={p.sm} oy={v=>upCsn(p.id,"sy",v)} om={v=>upCsn(p.id,"sm",v)}/></div>
+                  <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upCsn(p.id,"ey",v)} om={v=>upCsn(p.id,"em",v)}/></div>
+                  <div style={{fontSize:"0.72rem",color:"#9a80cc",background:"#ffffff06",borderRadius:8,padding:"5px 8px",marginTop:2,lineHeight:1.7}}>
+                    📚 Bidrag <b>4 092</b> + Lån <b>9 408</b> + Tilläggslån <b>4 656</b> = <b style={{color:"#a7f3c0"}}>18 156 kr/mån</b>
+                    {b1on&&<span style={{color:"#a7f3c0"}}> + Barn 1 tilläggsbidrag 780 kr</span>}
+                    {b2on&&<span style={{color:"#a7f3c0"}}> + Barn 2 tilläggsbidrag 496 kr</span>}
+                  </div>
+                </div>
+              ))}
+            </div>
+            <div style={{background:"#0d0b20",border:"2px solid #f472b633",borderRadius:14,padding:"12px 16px"}}>
+              <div style={{fontFamily:"'Fredoka One',cursive",color:"#f472b6",fontSize:"0.92rem",marginBottom:8}}>↩️ CSN-återbetalningsperioder</div>
+              <button onClick={addAtb} style={{padding:"6px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",background:"linear-gradient(135deg,#f472b6,#fb923c)",color:"#fff",boxShadow:"0 3px 12px #f472b644",marginBottom:10}}>
+                + Ny återbetalningsperiod ✨
+              </button>
+              {atbPeriods.length===0&&<div style={{fontSize:"0.74rem",color:"#5544aa"}}>Inga återbetalningsperioder aktiva.</div>}
+              {atbPeriods.map((p,i)=>(
+                <div key={p.id} style={{background:"#130a18",border:"1px solid #f472b633",borderRadius:12,padding:"10px 14px",marginBottom:8}}>
+                  <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
+                    <span style={{fontFamily:"'Fredoka One',cursive",color:"#f472b6",fontSize:"0.85rem"}}>📅 Period {i+1}</span>
+                    <button onClick={()=>rmAtb(p.id)} style={{background:"#f472b622",border:"1px solid #f472b655",color:"#f472b6",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"inherit",fontSize:"0.74rem"}}>Ta bort 🗑️</button>
+                  </div>
+                  <div className="row"><label>Från:</label><YM y={p.sy} m={p.sm} oy={v=>upAtb(p.id,"sy",v)} om={v=>upAtb(p.id,"sm",v)}/></div>
+                  <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upAtb(p.id,"ey",v)} om={v=>upAtb(p.id,"em",v)}/></div>
+                  <div className="row">
+                    <label>Belopp/mån:</label>
+                    <input type="number" value={p.belopp} onChange={e=>upAtb(p.id,"belopp",+e.target.value)} style={{...ins,width:90}}/>
+                  </div>
+                  <div style={{fontSize:"0.72rem",color:"#9a80cc"}}>Dras från V1:s inkomst: –{(p.belopp||0).toLocaleString("sv-SE")} kr/mån</div>
+                </div>
+              ))}
+            </div>
+          </Card>
+
+          <Card on={true}>
+            <div style={{fontFamily:"'Fredoka One',cursive",color:"#fbbf24",fontSize:"1.1rem",marginBottom:10}}>✈️ Semesterbudget</div>
+            <div className="row"><label>Kr/mån (sparas löpande):</label><input type="number" value={sem} onChange={e=>setSem(+e.target.value)} style={ins}/></div>
+            <div style={{fontSize:"0.74rem",color:"#7766aa"}}>Gemensam kostnad – fördelas proportionellt efter inkomst.</div>
+          </Card>
+        </div>
+      </div>
+    )}
+
+    {/* ── PENGAR UT ── */}
+    {tab==="utgifter"&&(
+      <div>
+        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>🛒 Pengar som flyger iväg</h2>
+        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+          {[{n:1,on:b1on,tog:setB1on,y:b1y,m:b1m,sy:setB1y,sm:setB1m,e:"👶"},{n:2,on:b2on,tog:setB2on,y:b2y,m:b2m,sy:setB2y,sm:setB2m,e:"🍼"}].map(({n,on,tog,y,m,sy,sm,e})=>(
+            <Card key={n} on={on}>
+              <Pill on={on} onClick={()=>tog(!on)} label={"Barn "+n} emoji={e}/>
+              {on&&<React.Fragment>
+                <div className="row" style={{marginTop:8}}><label>🎂 Födseldatum:</label><YM y={y} m={m} oy={sy} om={sm}/></div>
+                <div style={{fontSize:"0.74rem",color:"#7766aa"}}>Alla Barn {n}-poster aktiveras från detta datum! 🎊</div>
+              </React.Fragment>}
+            </Card>
+          ))}
+          <Card on={elon}>
+            <Pill on={elon} onClick={()=>setElon(!elon)} label="Elbilskostnader" emoji="🚗"/>
+            {elon&&<React.Fragment>
+              <div className="row" style={{marginTop:8}}><label>Från:</label><YM y={elsy} m={elsm} oy={setElsy} om={setElsm}/></div>
+              <div className="row"><label>Till:</label><YM y={eley} m={elem} oy={setEley} om={setElem}/></div>
+              <div style={{fontSize:"0.74rem",color:"#7766aa"}}>Laddning, försäkring, service, parkering… ≈ 3 484 kr/mån</div>
+            </React.Fragment>}
+          </Card>
+          <Card on={pkon}>
+            <Pill on={pkon} onClick={()=>setPkon(!pkon)} label="Periodkort (V1)" emoji="🚌"/>
+            {pkon&&<React.Fragment>
+              <div className="row" style={{marginTop:8}}><label>Från:</label><YM y={pksy} m={pksm} oy={setPksy} om={setPksm}/></div>
+              <div className="row"><label>Till:</label><YM y={pkey} m={pkem} oy={setPkey} om={setPkem}/></div>
+              <div style={{fontSize:"0.74rem",color:"#7766aa"}}>2 100 − 1 000 kr återbet. = netto 1 100 kr/mån</div>
+            </React.Fragment>}
+          </Card>
+        </div>
+
+        <div style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+          <Card on={true}>
+            <div style={{fontFamily:"'Fredoka One',cursive",color:"#818cf8",fontSize:"1.1rem",marginBottom:12}}>🏦 Privat pensionssparande (vid FL)</div>
+            <div className="row">
+              <label>Kr/mån under föräldraledighet:</label>
+              <input type="number" value={privPension} onChange={e=>setPrivPension(+e.target.value)} style={ins}/>
+            </div>
+            <div style={{fontSize:"0.74rem",color:"#7766aa",lineHeight:1.6}}>
+              Gemensam kostnad, fördelas proportionellt efter inkomst.<br/>
+              <span style={{color:"#818cf888"}}>Aktiveras automatiskt de månader föräldrapenning betalas ut.</span>
+            </div>
+          </Card>
+
+          <Card on={true}>
+            <div style={{fontFamily:"'Fredoka One',cursive",color:"#34d399",fontSize:"1.1rem",marginBottom:12}}>💰 Sparande</div>
+            <div className="row">
+              <label>Gemensamt sparande/mån:</label>
+              <input type="number" value={sparGem} onChange={e=>setSparGem(+e.target.value)} style={ins}/>
+            </div>
+            <div style={{marginTop:8,padding:"8px 12px",background:"#ffffff05",borderRadius:10}}>
+              <div style={{fontSize:"0.72rem",color:"#6655aa",marginBottom:6}}>Barnsparande (aktiveras när barnet är fött)</div>
+              <div className="row">
+                <label style={{color:b1on?"#a7f3c0":"#5544aa"}}>👶 Barn 1/mån:</label>
+                <input type="number" value={sparB1} onChange={e=>setSparB1(+e.target.value)} style={{...ins,opacity:b1on?1:0.4}}/>
+              </div>
+              <div className="row">
+                <label style={{color:b2on?"#a7f3c0":"#5544aa"}}>🍼 Barn 2/mån:</label>
+                <input type="number" value={sparB2} onChange={e=>setSparB2(+e.target.value)} style={{...ins,opacity:b2on?1:0.4}}/>
+              </div>
+            </div>
+            <div style={{fontSize:"0.74rem",color:"#7766aa",marginTop:8}}>Alla betraktas som gemensamma utgifter, fördelas proportionellt.</div>
+          </Card>
+        </div>
+
+        <Card on={false}>
+          <div style={{fontFamily:"'Fredoka One',cursive",color:"#6655aa",fontSize:"1rem",marginBottom:12}}>📌 Alltid aktiva (bakgrundsbrus)</div>
+          <div style={{display:"grid",gridTemplateColumns:"1fr 1fr",gap:"6px 20px",fontSize:"0.76rem"}}>
+            {[["🏡 Hyra","17 000 kr (år 1)"],["⚡ El+elnät","1 005 kr"],["🛡️ Hemförs.","300 kr"],["🍕 Mat V1","3 730 kr"],["🍕 Mat V2","3 730 kr"],["🛍️ Pers. V1","2 090 kr"],["🛍️ Pers. V2","2 090 kr"],["🚌 Övrigt koll.","600 kr"]].map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",background:"#ffffff05",borderRadius:8,padding:"4px 10px"}}>
+                <span style={{color:"#6655aa"}}>{k}</span><span style={{color:"#9980cc"}}>{v}</span>
+              </div>
+            ))}
+          </div>
+        </Card>
+      </div>
+    )}
+
+    {/* ── FP ── */}
+    {tab==="fp"&&(()=>{
+      const countDays=(periods)=>{
+        let v1=0,v2=0;
+        periods.forEach(p=>{
+          const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+          const months=Math.max(0,e-s+1);
+          const weeks=months*4.33;
+          v1+=Math.round((p.v1d||0)*weeks);
+          v2+=Math.round((p.v2d||0)*weeks);
+        });
+        return{v1,v2,tot:v1+v2};
+      };
+      const d1=countDays(fp1),d2=countDays(fp2);
+      const TOTAL=480,LOCKED=90;
+      const DayBar=({used,total,label,color})=>{
+        const pct=Math.min(100,Math.round(used/total*100));
+        const over=used>total;
+        return(
+          <div style={{marginBottom:8}}>
+            <div style={{display:"flex",justifyContent:"space-between",fontSize:"0.75rem",marginBottom:3}}>
+              <span style={{color:over?"#fca5a5":color}}>{label}</span>
+              <span style={{color:over?"#fca5a5":"#c4b5fd",fontWeight:700}}>{used} / {total} dagar {over&&"⚠️"}</span>
+            </div>
+            <div style={{background:"#1a1530",borderRadius:6,height:8,overflow:"hidden"}}>
+              <div style={{width:pct+"%",height:"100%",background:over?"linear-gradient(90deg,#f472b6,#ef4444)":color==="#a7f3c0"?"linear-gradient(90deg,#34d399,#a7f3c0)":"linear-gradient(90deg,#818cf8,#c084fc)",borderRadius:6,transition:"width 0.4s ease"}}/>
+            </div>
+          </div>
+        );
+      };
+      const WarnBox=({n,days})=>{
+        const over=days.tot>TOTAL;
+        const v1locked=days.v1<LOCKED,v2locked=days.v2<LOCKED;
+        if(!over&&!v1locked&&!v2locked) return null;
+        return(
+          <div style={{background:over?"#2a0a14":"#1a1008",border:"2px solid "+(over?"#ef444488":"#f59e0b88"),borderRadius:12,padding:"10px 14px",marginBottom:12,fontSize:"0.76rem"}}>
+            {over&&<div style={{color:"#fca5a5",marginBottom:4}}>🚨 Barn {n}: {days.tot - TOTAL} dagar för många uttagna! Max 480 dagar per barn.</div>}
+            {v1locked&&<div style={{color:"#fcd34d"}}>⚠️ V1 har uttaget {days.v1} dagar — de 90 låsta dagarna är inte täckta än.</div>}
+            {v2locked&&<div style={{color:"#fcd34d"}}>⚠️ V2 har uttaget {days.v2} dagar — de 90 låsta dagarna är inte täckta än.</div>}
+          </div>
+        );
+      };
+      return(
+      <div>
+        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:12}}>🍼 Föräldrapenning</h2>
+        <div style={{background:"#160e28",border:"2px solid #c084fc44",borderRadius:18,padding:"16px 20px",marginBottom:20,fontSize:"0.82rem",lineHeight:1.8}}>
+          <div style={{fontFamily:"'Fredoka One',cursive",color:"#f0abfc",fontSize:"1.1rem",marginBottom:6}}>📋 Reglerna i korthet</div>
+          <div>480 dagar per barn · 90 dagar låsta per vuxen · upp till 30 dubbeldagar</div>
+          <div>👩 V1: <b style={{color:"#a7f3c0"}}>747 kr/dag</b> (+95 kr de första 180 dagarna) · 👨 V2: <b style={{color:"#a7f3c0"}}>844 kr/dag</b></div>
+          <div style={{color:"#7766aa"}}>Sista 90 dagarna per barn: 180 kr/dag (lägstanivå)</div>
+        </div>
+        {[1,2].map(n=>{
+          const on=n===1?b1on:b2on;
+          const ps=n===1?fp1:fp2;
+          const days=n===1?d1:d2;
+          return(
+            <Card key={n} on={on}>
+              <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.2rem",color:on?"#f0abfc":"#443366",marginBottom:on?14:0}}>
+                {n===1?"👶":"🍼"} Barn {n} – perioder
+              </div>
+              {!on&&<div style={{fontSize:"0.78rem",color:"#5544aa"}}>Aktivera Barn {n} under 🛒 Pengar ut först!</div>}
+              {on&&<React.Fragment>
+                {ps.length>0&&<div style={{background:"#0d0b20",borderRadius:12,padding:"12px 14px",marginBottom:12}}>
+                  <div style={{fontFamily:"'Fredoka One',cursive",color:"#c084fc",fontSize:"0.88rem",marginBottom:10}}>📊 Dagssaldo</div>
+                  <DayBar used={days.tot} total={TOTAL} label="Totalt uttaget" color="#c084fc"/>
+                  <DayBar used={days.v1} total={Math.round(TOTAL/2)} label="V1:s dagar" color="#a7f3c0"/>
+                  <DayBar used={days.v2} total={Math.round(TOTAL/2)} label="V2:s dagar" color="#818cf8"/>
+                  <div style={{display:"grid",gridTemplateColumns:"1fr 1fr 1fr",gap:6,marginTop:8,fontSize:"0.72rem",textAlign:"center"}}>
+                    {[
+                      ["Kvar totalt",Math.max(0,TOTAL-days.tot),days.tot>TOTAL?"#fca5a5":"#a7f3c0"],
+                      ["V1 kvar",Math.max(0,Math.round(TOTAL/2)-days.v1),days.v1>TOTAL/2?"#fca5a5":"#a7f3c0"],
+                      ["V2 kvar",Math.max(0,Math.round(TOTAL/2)-days.v2),days.v2>TOTAL/2?"#fca5a5":"#818cf8"],
+                    ].map(([lbl,val,col])=>(
+                      <div key={lbl} style={{background:"#ffffff08",borderRadius:8,padding:"6px 4px"}}>
+                        <div style={{color:"#6655aa",marginBottom:2}}>{lbl}</div>
+                        <div style={{color:col,fontWeight:700,fontSize:"0.85rem"}}>{val} dagar</div>
+                      </div>
+                    ))}
+                  </div>
+                </div>}
+                <WarnBox n={n} days={days}/>
+                <button onClick={()=>addFp(n)} style={{background:"linear-gradient(135deg,#c084fc,#f472b6)",border:"none",color:"#fff",fontFamily:"'Fredoka One',cursive",fontSize:"0.95rem",padding:"8px 20px",borderRadius:20,cursor:"pointer",marginBottom:14,boxShadow:"0 4px 14px #c084fc55"}}>✨ Ny period</button>
+                {ps.length===0&&<div style={{fontSize:"0.78rem",color:"#5544aa"}}>Inga perioder än – lägg till! 🎈</div>}
+                {ps.map(p=>{
+                  const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+                  const months=Math.max(0,e-s+1);
+                  const weeks=months*4.33;
+                  const pV1days=Math.round((p.v1d||0)*weeks);
+                  const pV2days=Math.round((p.v2d||0)*weeks);
+                  return(
+                    <div key={p.id} style={{background:"#0d0b20",border:"2px solid #c084fc33",borderRadius:14,padding:"12px 16px",marginBottom:10}}>
+                      <div style={{display:"flex",justifyContent:"space-between",marginBottom:10}}>
+                        <span style={{fontFamily:"'Fredoka One',cursive",color:"#c084fc"}}>📅 Period</span>
+                        <button onClick={()=>rmFp(n,p.id)} style={{background:"#f472b622",border:"1px solid #f472b655",color:"#f472b6",borderRadius:8,padding:"3px 10px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontSize:"0.74rem"}}>Ta bort 🗑️</button>
+                      </div>
+                      <div className="row"><label>Från:</label><YM y={p.sy} m={p.sm} oy={v=>upFp(n,p.id,"sy",v)} om={v=>upFp(n,p.id,"sm",v)}/></div>
+                      <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upFp(n,p.id,"ey",v)} om={v=>upFp(n,p.id,"em",v)}/></div>
+                      <div className="row">
+                        <label>V1 FP-dagar/vecka:</label>
+                        <input type="number" min={0} max={7} value={p.v1d} onChange={e=>upFp(n,p.id,"v1d",+e.target.value)} style={{...ins,width:60}}/>
+                        <label>V2 FP-dagar/vecka:</label>
+                        <input type="number" min={0} max={7} value={p.v2d} onChange={e=>upFp(n,p.id,"v2d",+e.target.value)} style={{...ins,width:60}}/>
+                      </div>
+                      <div style={{fontSize:"0.72rem",color:"#7766aa",marginTop:2}}>
+                        ≈ V1: {fmt(p.v1d*4.33*747)}/mån · V2: {fmt(p.v2d*4.33*844)}/mån
+                      </div>
+                      <div style={{fontSize:"0.72rem",color:"#9a80cc",marginTop:4}}>
+                        Denna period: V1 ≈ <b style={{color:"#a7f3c0"}}>{pV1days} dagar</b> · V2 ≈ <b style={{color:"#818cf8"}}>{pV2days} dagar</b>
+                      </div>
+                    </div>
+                  );
+                })}
+              </React.Fragment>}
+            </Card>
+          );
+        })}
+      </div>
+      );
+    })()}
+
+    {/* ── TABELL ── */}
+    {tab==="tabell"&&(
+      <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"flex-start"}}>
+        <div style={{flex:1,minWidth:0}}>
+          <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:6}}>📊 Månadskartan</h2>
+          <p style={{color:"#7766aa",fontSize:"0.8rem",marginBottom:18}}>Håll muspekaren över en månad för detaljer 🔍  ·  Siffror i tusental (k)</p>
+          <div style={{overflowX:"auto"}}>
+            <table style={{borderCollapse:"separate",borderSpacing:"4px 4px"}}>
+              <thead>
+                <tr>
+                  <th style={{background:"#160e28",color:"#c084fc",padding:"8px 14px",borderRadius:10,fontFamily:"'Fredoka One',cursive",fontSize:"0.85rem"}}>År</th>
+                  {MONTHS.map(mn=><th key={mn} style={{background:"#160e28",color:"#c084fc",padding:"6px 4px",borderRadius:10,fontFamily:"'Fredoka One',cursive",fontSize:"0.78rem",textAlign:"center",minWidth:62}}>{mn}</th>)}
+                </tr>
+              </thead>
+              <tbody>
+                {Object.keys(byYear).sort().map(yr=>(
+                  <tr key={yr}>
+                    <td style={{background:"#160e28",color:"#f0abfc",padding:"8px 14px",borderRadius:10,fontFamily:"'Fredoka One',cursive",fontSize:"0.9rem",textAlign:"center",whiteSpace:"nowrap"}}>{yr}</td>
+                    {byYear[yr].map(cell=>{
+                      const md=mood(cell.tot);
+                      return(
+                        <td key={cell.month} style={{padding:0}}>
+                          <div className="cell"
+                            onMouseEnter={e=>onEnt(cell,e)} onMouseLeave={onLv}
+                            style={{background:md.bg,border:"2px solid "+md.border,borderRadius:12,padding:"5px 3px",textAlign:"center",cursor:"pointer",transition:"transform 0.15s, box-shadow 0.15s",minWidth:60}}>
+                            <div style={{fontSize:"1.1rem",lineHeight:1}}>{md.emoji}</div>
+                            <div style={{color:md.text,fontWeight:900,fontSize:"0.72rem",marginTop:2}}>{Math.round(cell.tot/1000)}k</div>
+                            <div style={{color:md.text,opacity:0.65,fontSize:"0.58rem"}}>{Math.round(cell.v1f/1000)}·{Math.round(cell.v2f/1000)}</div>
+                          </div>
+                        </td>
+                      );
+                    })}
+                  </tr>
+                ))}
+              </tbody>
+            </table>
+          </div>
+          <div style={{marginTop:14,display:"flex",gap:12,flexWrap:"wrap",fontSize:"0.74rem"}}>
+            {MOODS.map(m=><span key={m.emoji} style={{color:m.text,background:m.bg,border:"1px solid "+m.border,borderRadius:8,padding:"3px 10px"}}>{m.emoji} {m.label}</span>)}
+          </div>
+          <div style={{marginTop:8,fontSize:"0.66rem",color:"#443366"}}>Totalt / V1 · V2</div>
+        </div>
+
+        {/* SIDOPANEL */}
+        <div style={{width:210,flexShrink:0}}>
+          <div style={{fontFamily:"'Fredoka One',cursive",color:"#fbbf24",fontSize:"1rem",marginBottom:12}}>🔒 Sidoposter</div>
+          {[{title:"Innan skatt",color:"#7bb3e0",rows:[lon1.length>0&&["V1 Lön","43 700 kr (heltid)"],lon2.length>0&&["V2 Lön","50 100 kr (heltid)"]].filter(Boolean)},
+            {title:"Pension/mån",color:"#c084fc",rows:[lon1.length>0&&["V1 Statlig","7 519 kr"],lon1.length>0&&["V1 Tjänste","1 967 kr"],lon2.length>0&&["V2 Statlig","8 620 kr"],lon2.length>0&&["V2 Tjänste","2 886 kr"]].filter(Boolean)}
+          ].map(({title,color,rows})=>(
+            <div key={title} style={{background:"#0e0d1e",border:"2px solid #1e1840",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
+              <div style={{color:color,fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",marginBottom:8}}>{title}</div>
+              {rows.length===0&&<div style={{color:"#333",fontSize:"0.72rem"}}>Inget aktiverat</div>}
+              {rows.map(([k,v])=><div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:"0.72rem",marginBottom:4}}><span style={{color:"#6655aa"}}>{k}</span><span style={{color:color}}>{v}</span></div>)}
+            </div>
+          ))}
+          {data[0]&&(
+            <div style={{background:"#0e0d1e",border:"2px solid #fbbf2444",borderRadius:14,padding:"12px 14px"}}>
+              <div style={{color:"#fbbf24",fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",marginBottom:8}}>📍 Jan 2026</div>
+              {[["💼 V1 inkomst",data[0].v1i,"#a7f3c0"],["💼 V2 inkomst",data[0].v2i,"#a7f3c0"],["🏠 Delade kostn.",data[0].sh,"#fca5a5"],["🎯 V1 kvar",data[0].v1f,data[0].v1f>=0?"#a7f3c0":"#fca5a5"],["🎯 V2 kvar",data[0].v2f,data[0].v2f>=0?"#a7f3c0":"#fca5a5"]].map(([k,v,c])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",fontSize:"0.7rem",marginBottom:4}}><span style={{color:"#6655aa"}}>{k}</span><span style={{color:c}}>{fmt(v)}</span></div>
+              ))}
+            </div>
+          )}
+        </div>
+      </div>
+    )}
+
+    </div>
+
+    {/* TOOLTIP */}
+    {hover&&(
+      <div style={{position:"fixed",left:Math.min(ttxy.x+16,window.innerWidth-340),top:Math.min(ttxy.y-10,window.innerHeight-400),background:"linear-gradient(135deg,#180e2e,#0e0d20)",border:"2px solid #c084fc99",borderRadius:18,padding:"16px 20px",maxWidth:320,zIndex:9999,pointerEvents:"none",boxShadow:"0 8px 40px #c084fc55",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",animation:"pop 0.15s ease"}}>
+        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:10,borderBottom:"1px solid #2a1a4a",paddingBottom:6}}>
+          {mood(hover.tot).emoji} {MONTHS[hover.month-1]} {hover.year}
+        </div>
+
+        {Object.keys(hover.gi).length>0&&<React.Fragment>
+          <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Inkomster</div>
+          {Object.entries(hover.gi).map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
+              <span style={{color:"#c4b5fd"}}>{k}</span>
+              <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(v)}</span>
+            </div>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
+            <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa inkomster</span>
+            <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(hover.v1i+hover.v2i)}</span>
+          </div>
+        </React.Fragment>}
+
+        {(Object.keys(hover.gc1).length>0||Object.keys(hover.gc2).length>0)&&(()=>{
+          const merged={};
+          Object.entries(hover.gc1).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
+          Object.entries(hover.gc2).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
+          return(<React.Fragment>
+            <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Individuella utgifter</div>
+            {Object.entries(merged).map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
+                <span style={{color:"#f9a8d4"}}>{k}</span>
+                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
+              <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa individuella</span>
+              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(hover.v1c+hover.v2c)}</span>
+            </div>
+          </React.Fragment>);
+        })()}
+
+        {Object.keys(hover.gsh).length>0&&<React.Fragment>
+          <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+            Delade utgifter ({Math.round(hover.v1share*100)}% V1 / {Math.round(hover.v2share*100)}% V2)
+          </div>
+          {Object.entries(hover.gsh).map(([k,v])=>(
+            <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
+              <span style={{color:"#f9a8d4"}}>{k}</span>
+              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
+            </div>
+          ))}
+          <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
+            <span style={{color:"#9980cc",fontStyle:"italic"}}>V1 betalar / V2 betalar</span>
+            <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(hover.sh*hover.v1share)} / –{fmt(hover.sh*hover.v2share)}</span>
+          </div>
+        </React.Fragment>}
+
+        <div style={{display:"flex",flexDirection:"column",gap:5}}>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span style={{color:"#9980cc"}}>👩 V1 kvar</span>
+            <span style={{fontWeight:700,color:hover.v1f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(hover.v1f)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between"}}>
+            <span style={{color:"#9980cc"}}>👨 V2 kvar</span>
+            <span style={{fontWeight:700,color:hover.v2f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(hover.v2f)}</span>
+          </div>
+          <div style={{display:"flex",justifyContent:"space-between",background:"#ffffff0a",borderRadius:10,padding:"7px 10px",marginTop:4}}>
+            <span style={{color:"#f0abfc",fontFamily:"'Fredoka One',cursive"}}>Totalt kvar</span>
+            <span style={{color:hover.tot>=0?"#a7f3c0":"#fca5a5",fontFamily:"'Fredoka One',cursive",fontSize:"1.05rem"}}>{fmt(hover.tot)}</span>
+          </div>
+        </div>
+      </div>
+    )}
+
+  </div>
+  );
+}
+
+ReactDOM.createRoot(document.getElementById("root")).render(<App/>);
+</script>
+</body>
+</html>
