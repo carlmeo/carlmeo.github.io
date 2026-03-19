@@ -209,6 +209,7 @@ const DEFAULT_STATE={
   csnPeriods:[],atbPeriods:[],
   lon1:[{id:1,sy:2026,sm:1,ey:2033,em:12,dagar:5}],
   lon2:[{id:2,sy:2026,sm:1,ey:2033,em:12,dagar:5}],
+  lon1Heltid:34219, lon2Heltid:38269,
   elon:true,elsy:2026,elsm:1,eley:2033,elem:12,
   pkon:true,pksy:2026,pksm:1,pkey:2033,pkem:12,
   sem:1667,privPension:500,sparGem:1000,sparB1:500,sparB2:500,
@@ -242,6 +243,8 @@ function App(){
   const[atbPeriods,setAtbPeriods]=useState(DEFAULT_STATE.atbPeriods);
   const[lon1,setLon1]=useState(DEFAULT_STATE.lon1);
   const[lon2,setLon2]=useState(DEFAULT_STATE.lon2);
+  const[lon1Heltid,setLon1Heltid]=useState(DEFAULT_STATE.lon1Heltid);
+  const[lon2Heltid,setLon2Heltid]=useState(DEFAULT_STATE.lon2Heltid);
   const[elon,setElon]=useState(DEFAULT_STATE.elon);
   const[elsy,setElsy]=useState(DEFAULT_STATE.elsy);const[elsm,setElsm]=useState(DEFAULT_STATE.elsm);
   const[eley,setEley]=useState(DEFAULT_STATE.eley);const[elem,setElem]=useState(DEFAULT_STATE.elem);
@@ -279,6 +282,8 @@ function App(){
     setAtbPeriods(s.atbPeriods??DEFAULT_STATE.atbPeriods);
     setLon1(s.lon1??DEFAULT_STATE.lon1);
     setLon2(s.lon2??DEFAULT_STATE.lon2);
+    setLon1Heltid(s.lon1Heltid??DEFAULT_STATE.lon1Heltid);
+    setLon2Heltid(s.lon2Heltid??DEFAULT_STATE.lon2Heltid);
     setElon(s.elon??DEFAULT_STATE.elon);
     setElsy(s.elsy??DEFAULT_STATE.elsy);setElsm(s.elsm??DEFAULT_STATE.elsm);
     setEley(s.eley??DEFAULT_STATE.eley);setElem(s.elem??DEFAULT_STATE.elem);
@@ -345,9 +350,9 @@ function App(){
   const saveTimer=useRef(null);
   const currentState=useMemo(()=>({
     b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,
-    lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,
+    lon1,lon2,lon1Heltid,lon2Heltid,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,
     sem,privPension,sparGem,sparB1,sparB2,fp1,fp2
-  }),[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,sem,privPension,sparGem,sparB1,sparB2,fp1,fp2]);
+  }),[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,lon1Heltid,lon2Heltid,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,sem,privPension,sparGem,sparB1,sparB2,fp1,fp2]);
 
   // Only save after initial load is complete
   const firstRender=useRef(true);
@@ -460,8 +465,8 @@ function App(){
       for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)atbArr[i]+=(p.belopp||0);
     });
     const sv1=new Array(TOTAL_MONTHS).fill(0),sv2=new Array(TOTAL_MONTHS).fill(0);
-    lon1.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv1[i]+=34219*(p.dagar/5);});
-    lon2.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv2[i]+=38269*(p.dagar/5);});
+    lon1.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv1[i]+=lon1Heltid*(p.dagar/5);});
+    lon2.forEach(p=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);for(let i=s;i<=e&&i<TOTAL_MONTHS;i++)sv2[i]+=lon2Heltid*(p.dagar/5);});
     const fv1=new Array(TOTAL_MONTHS).fill(0),fv2=new Array(TOTAL_MONTHS).fill(0);
     [[fp1,b1s],[fp2,b2s]].forEach(([ps,bs])=>{
       if(bs===-1)return;
@@ -506,9 +511,29 @@ function App(){
       const v1share=totalI>0?v1i/totalI:0.5;
       const v2share=totalI>0?v2i/totalI:0.5;
       const v1sh=sh*v1share;const v2sh=sh*v2share;
-      return{year,month,mi,gi,gc1,gc2,gsh,v1i,v2i,sh,v1share,v2share,v1c,v2c,v1f:v1i-v1c-v1sh,v2f:v2i-v2c-v2sh,get tot(){return this.v1f+this.v2f;}};
+      const flags=[];
+      if(b1on&&mi===b1s) flags.push({icon:"👶",text:"Barn 1 föds"});
+      if(b2on&&mi===b2s) flags.push({icon:"🍼",text:"Barn 2 föds"});
+      lon1.forEach((p,pi)=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+        if(mi===s) flags.push({icon:"💼",text:"V1 lön startar"+(lon1.length>1?" (p"+(pi+1)+")":""),start:true});
+        if(mi===e&&e<TOTAL_MONTHS-1) flags.push({icon:"💼",text:"V1 lön slutar"+(lon1.length>1?" (p"+(pi+1)+")":""),start:false});
+      });
+      lon2.forEach((p,pi)=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+        if(mi===s) flags.push({icon:"💼",text:"V2 lön startar"+(lon2.length>1?" (p"+(pi+1)+")":""),start:true});
+        if(mi===e&&e<TOTAL_MONTHS-1) flags.push({icon:"💼",text:"V2 lön slutar"+(lon2.length>1?" (p"+(pi+1)+")":""),start:false});
+      });
+      csnPeriods.forEach((p,pi)=>{const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+        if(mi===s) flags.push({icon:"🎓",text:"CSN startar"+(csnPeriods.length>1?" (p"+(pi+1)+")":""),start:true});
+        if(mi===e) flags.push({icon:"🎓",text:"CSN slutar"+(csnPeriods.length>1?" (p"+(pi+1)+")":""),start:false});
+      });
+      [...fp1.map(p=>({...p,barn:1})),...fp2.map(p=>({...p,barn:2}))].forEach(p=>{
+        const s=dIdx(p.sy,p.sm),e=dIdx(p.ey,p.em);
+        if(mi===s) flags.push({icon:"🍼",text:"FP Barn "+p.barn+" startar",start:true});
+        if(mi===e) flags.push({icon:"🍼",text:"FP Barn "+p.barn+" slutar",start:false});
+      });
+      return{year,month,mi,gi,gc1,gc2,gsh,v1i,v2i,sh,v1share,v2share,v1c,v2c,v1f:v1i-v1c-v1sh,v2f:v2i-v2c-v2sh,flags,get tot(){return this.v1f+this.v2f;}};
     });
-  },[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,fp1,fp2,sem,privPension,sparGem,sparB1,sparB2]);
+  },[b1on,b1y,b1m,b2on,b2y,b2m,csnPeriods,atbPeriods,lon1,lon2,lon1Heltid,lon2Heltid,elon,elsy,elsm,eley,elem,pkon,pksy,pksm,pkey,pkem,fp1,fp2,sem,privPension,sparGem,sparB1,sparB2]);
 
   const byYear=useMemo(()=>{const g={};data.forEach(d=>{if(!g[d.year])g[d.year]=[];g[d.year].push(d);});return g;},[data]);
 
@@ -525,6 +550,28 @@ function App(){
     </span>
   );
   const Card=({on,children})=>(<div style={{background:on?"#160e28":"#0e0d1e",border:"2px solid "+(on?"#c084fc66":"#252040"),borderRadius:18,padding:"16px 20px",marginBottom:16,boxShadow:on?"0 0 24px #c084fc1a":"none",transition:"all 0.3s"}}>{children}</div>);
+
+  // Number input that only commits on blur or Enter — prevents mid-typing sync
+  const NumInput=({value,onChange,style:extraStyle})=>{
+    const[local,setLocal]=useState(String(value));
+    const ref=useRef(null);
+    // Sync from parent when value changes externally (e.g. Firebase sync)
+    useEffect(()=>{
+      if(ref.current!==document.activeElement){
+        setLocal(String(value));
+      }
+    },[value]);
+    const commit=()=>{
+      const n=parseFloat(local);
+      if(!isNaN(n)){onChange(n);}
+      else{setLocal(String(value));}
+    };
+    return <input ref={ref} type="text" inputMode="numeric" value={local}
+      onChange={e=>setLocal(e.target.value)}
+      onBlur={commit}
+      onKeyDown={e=>{if(e.key==="Enter"){commit();e.target.blur();}}}
+      style={{...ins,...(extraStyle||{})}}/>;
+  };
   const Pill=({on,onClick,label,emoji})=>(
     <button onClick={onClick} style={{padding:"7px 18px",borderRadius:20,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.95rem",background:on?"linear-gradient(135deg,#c084fc,#f472b6)":"#1a1930",color:on?"#fff":"#6655aa",boxShadow:on?"0 0 16px #c084fc66":"none",transition:"all 0.25s",marginRight:8,marginBottom:8}}>
       {emoji} {label} {on?"✓":""}
@@ -582,7 +629,7 @@ function App(){
         <span className="mob-header-icon" style={{fontSize:"3rem",animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🏠</span>
         <div style={{flex:1,minWidth:0}}>
           <h1 className="mob-header-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"2.6rem",background:"linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"0.02em"}}>Familjens Pengakarta!</h1>
-          <div className="mob-header-sub" style={{color:"#7766aa",fontSize:"0.82rem",marginTop:2}}>2026 → 2033 · Utforska, klicka, och ha kul! 🎉</div>
+          <div className="mob-header-sub" style={{color:"#7766aa",fontSize:"0.82rem",marginTop:2}}>2026 → 2030 · Utforska, klicka, och ha kul! 🎉</div>
         </div>
         <div className="mob-toolbar" style={{display:"flex",gap:8,flexWrap:"wrap"}}>
           <button onClick={handleShare} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Dela med andra">{isMobile?"🔗":"🔗 Dela"}</button>
@@ -605,20 +652,27 @@ function App(){
       <div>
         <h2 className="mob-section-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>💸 Pengar som ramlar in</h2>
         <div className="mob-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
-          {[{n:1,lon:lon1,addL:()=>addLon(1),rmL:(id)=>rmLon(1,id),upL:(id,f,v)=>upLon(1,id,f,v),heltid:"34 219",pension:"9 485"},
-            {n:2,lon:lon2,addL:()=>addLon(2),rmL:(id)=>rmLon(2,id),upL:(id,f,v)=>upLon(2,id,f,v),heltid:"38 269",pension:"11 505"}
-          ].map(({n,lon,addL,rmL,upL,heltid,pension})=>(
+          {[{n:1,lon:lon1,addL:()=>addLon(1),rmL:(id)=>rmLon(1,id),upL:(id,f,v)=>upLon(1,id,f,v),heltid:lon1Heltid,setHeltid:setLon1Heltid,pension:"9 485"},
+            {n:2,lon:lon2,addL:()=>addLon(2),rmL:(id)=>rmLon(2,id),upL:(id,f,v)=>upLon(2,id,f,v),heltid:lon2Heltid,setHeltid:setLon2Heltid,pension:"11 505"}
+          ].map(({n,lon,addL,rmL,upL,heltid,setHeltid,pension})=>(
             <Card key={n} on={lon.length>0}>
               <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:12}}>
                 🧑 Vuxen {n} – Lön
+              </div>
+              <div style={{background:"#ffffff05",borderRadius:10,padding:"10px 12px",marginBottom:12}}>
+                <div className="row">
+                  <label>💼 Heltidslön (efter skatt):</label>
+                  <NumInput value={heltid} onChange={v=>setHeltid(v)} style={{width:110}}/>
+                  <span style={{fontSize:"0.72rem",color:"#7766aa"}}>kr/mån</span>
+                </div>
+                <div style={{fontSize:"0.68rem",color:"#6655aa"}}>🔒 Pension: {pension} kr/mån (separat, ej medräknad)</div>
               </div>
               <button onClick={addL} style={{padding:"6px 16px",borderRadius:16,border:"none",cursor:"pointer",fontFamily:"'Fredoka One',cursive",fontSize:"0.88rem",background:"linear-gradient(135deg,#c084fc,#f472b6)",color:"#fff",boxShadow:"0 3px 12px #c084fc44",marginBottom:12}}>
                 + Ny lönperiod ✨
               </button>
               {lon.length===0&&<div style={{fontSize:"0.78rem",color:"#5544aa"}}>Inga perioder – ingen lön! 💸</div>}
               {lon.map((p,i)=>{
-                const dagslon=n===1?34219:38269;
-                const manadsinkomst=Math.round(dagslon*(p.dagar/5));
+                const manadsinkomst=Math.round(heltid*(p.dagar/5));
                 return(
                   <div key={p.id} style={{background:"#0d0b20",border:"2px solid #c084fc33",borderRadius:14,padding:"12px 16px",marginBottom:10}}>
                     <div style={{display:"flex",justifyContent:"space-between",alignItems:"center",marginBottom:8}}>
@@ -634,15 +688,12 @@ function App(){
                       </select>
                     </div>
                     <div style={{fontSize:"0.72rem",color:"#9a80cc",background:"#ffffff06",borderRadius:8,padding:"5px 8px",marginTop:2}}>
-                      ≈ <b style={{color:"#a7f3c0"}}>{manadsinkomst.toLocaleString("sv-SE")} kr/mån</b>
+                      ≈ <b style={{color:"#a7f3c0"}}>{manadsinkomst.toLocaleString("sv-SE")} kr/mån</b> (efter skatt)
                       {p.dagar<5&&<span style={{color:"#fbbf24"}}> ({p.dagar}/5 av heltid)</span>}
                     </div>
                   </div>
                 );
               })}
-              <div style={{background:"#ffffff05",borderRadius:10,padding:"7px 10px",fontSize:"0.72rem",color:"#7766aa",marginTop:4}}>
-                💼 Heltidslön: {heltid} kr/mån · 🔒 Pension: {pension} kr/mån (separat)
-              </div>
             </Card>
           ))}
 
@@ -686,7 +737,7 @@ function App(){
                   <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upAtb(p.id,"ey",v)} om={v=>upAtb(p.id,"em",v)}/></div>
                   <div className="row">
                     <label>Belopp/mån:</label>
-                    <input type="number" value={p.belopp} onChange={e=>upAtb(p.id,"belopp",+e.target.value)} style={{...ins,width:90}}/>
+                    <NumInput value={p.belopp} onChange={v=>upAtb(p.id,"belopp",v)} style={{width:90}}/>
                   </div>
                   <div style={{fontSize:"0.72rem",color:"#9a80cc"}}>Dras från V1:s inkomst: –{(p.belopp||0).toLocaleString("sv-SE")} kr/mån</div>
                 </div>
@@ -696,7 +747,7 @@ function App(){
 
           <Card on={true}>
             <div style={{fontFamily:"'Fredoka One',cursive",color:"#fbbf24",fontSize:"1.1rem",marginBottom:10}}>✈️ Semesterbudget</div>
-            <div className="row"><label>Kr/mån (sparas löpande):</label><input type="number" value={sem} onChange={e=>setSem(+e.target.value)} style={ins}/></div>
+            <div className="row"><label>Kr/mån (sparas löpande):</label><NumInput value={sem} onChange={v=>setSem(v)}/></div>
             <div style={{fontSize:"0.74rem",color:"#7766aa"}}>Gemensam kostnad – fördelas proportionellt efter inkomst.</div>
           </Card>
         </div>
@@ -740,7 +791,7 @@ function App(){
             <div style={{fontFamily:"'Fredoka One',cursive",color:"#818cf8",fontSize:"1.1rem",marginBottom:12}}>🏦 Privat pensionssparande (vid FL)</div>
             <div className="row">
               <label>Kr/mån under föräldraledighet:</label>
-              <input type="number" value={privPension} onChange={e=>setPrivPension(+e.target.value)} style={ins}/>
+              <NumInput value={privPension} onChange={v=>setPrivPension(v)}/>
             </div>
             <div style={{fontSize:"0.74rem",color:"#7766aa",lineHeight:1.6}}>
               Gemensam kostnad, fördelas proportionellt efter inkomst.<br/>
@@ -752,17 +803,17 @@ function App(){
             <div style={{fontFamily:"'Fredoka One',cursive",color:"#34d399",fontSize:"1.1rem",marginBottom:12}}>💰 Sparande</div>
             <div className="row">
               <label>Gemensamt sparande/mån:</label>
-              <input type="number" value={sparGem} onChange={e=>setSparGem(+e.target.value)} style={ins}/>
+              <NumInput value={sparGem} onChange={v=>setSparGem(v)}/>
             </div>
             <div style={{marginTop:8,padding:"8px 12px",background:"#ffffff05",borderRadius:10}}>
               <div style={{fontSize:"0.72rem",color:"#6655aa",marginBottom:6}}>Barnsparande (aktiveras när barnet är fött)</div>
               <div className="row">
                 <label style={{color:b1on?"#a7f3c0":"#5544aa"}}>👶 Barn 1/mån:</label>
-                <input type="number" value={sparB1} onChange={e=>setSparB1(+e.target.value)} style={{...ins,opacity:b1on?1:0.4}}/>
+                <NumInput value={sparB1} onChange={v=>setSparB1(v)} style={{opacity:b1on?1:0.4}}/>
               </div>
               <div className="row">
                 <label style={{color:b2on?"#a7f3c0":"#5544aa"}}>🍼 Barn 2/mån:</label>
-                <input type="number" value={sparB2} onChange={e=>setSparB2(+e.target.value)} style={{...ins,opacity:b2on?1:0.4}}/>
+                <NumInput value={sparB2} onChange={v=>setSparB2(v)} style={{opacity:b2on?1:0.4}}/>
               </div>
             </div>
             <div style={{fontSize:"0.74rem",color:"#7766aa",marginTop:8}}>Alla betraktas som gemensamma utgifter, fördelas proportionellt.</div>
@@ -881,9 +932,9 @@ function App(){
                       <div className="row"><label>Till:</label><YM y={p.ey} m={p.em} oy={v=>upFp(n,p.id,"ey",v)} om={v=>upFp(n,p.id,"em",v)}/></div>
                       <div className="row">
                         <label>V1 FP-dagar/vecka:</label>
-                        <input type="number" min={0} max={7} value={p.v1d} onChange={e=>upFp(n,p.id,"v1d",+e.target.value)} style={{...ins,width:60}}/>
+                        <NumInput value={p.v1d} onChange={v=>upFp(n,p.id,"v1d",v)} style={{width:60}}/>
                         <label>V2 FP-dagar/vecka:</label>
-                        <input type="number" min={0} max={7} value={p.v2d} onChange={e=>upFp(n,p.id,"v2d",+e.target.value)} style={{...ins,width:60}}/>
+                        <NumInput value={p.v2d} onChange={v=>upFp(n,p.id,"v2d",v)} style={{width:60}}/>
                       </div>
                       <div style={{fontSize:"0.72rem",color:"#7766aa",marginTop:2}}>
                         ≈ V1: {fmt(p.v1d*4.33*747)}/mån · V2: {fmt(p.v2d*4.33*844)}/mån
@@ -917,20 +968,23 @@ function App(){
                 </tr>
               </thead>
               <tbody>
-                {Object.keys(byYear).sort().map(yr=>(
+                {Object.keys(byYear).sort().filter(yr=>+yr>=2026&&+yr<=2030).map(yr=>(
                   <tr key={yr}>
                     <td style={{background:"#160e28",color:"#f0abfc",padding:"8px 14px",borderRadius:10,fontFamily:"'Fredoka One',cursive",fontSize:"0.9rem",textAlign:"center",whiteSpace:"nowrap"}}>{yr}</td>
                     {byYear[yr].map(cell=>{
                       const md=mood(cell.tot);
+                      const hasFlags=cell.flags&&cell.flags.length>0;
                       return(
                         <td key={cell.month} style={{padding:0}}>
                           <div className="cell"
                             onClick={()=>isMobile&&setTapped(tapped&&tapped.mi===cell.mi?null:cell)}
                             onMouseEnter={e=>!isMobile&&onEnt(cell,e)} onMouseLeave={()=>!isMobile&&onLv()}
-                            style={{background:md.bg,border:"2px solid "+md.border,borderRadius:12,padding:"5px 3px",textAlign:"center",cursor:"pointer",transition:"transform 0.15s, box-shadow 0.15s",minWidth:60}}>
+                            style={{background:md.bg,border:hasFlags?"2px solid #f0abfc":"2px solid "+md.border,borderRadius:12,padding:"5px 3px",textAlign:"center",cursor:"pointer",transition:"transform 0.15s, box-shadow 0.15s",minWidth:60,position:"relative"}}>
+                            {hasFlags&&<div style={{position:"absolute",top:-4,right:-4,background:"#c084fc",borderRadius:"50%",width:14,height:14,fontSize:"0.5rem",lineHeight:"14px",color:"#fff",fontWeight:900,boxShadow:"0 0 6px #c084fc"}}>{cell.flags.length}</div>}
                             <div style={{fontSize:"1.1rem",lineHeight:1}}>{md.emoji}</div>
                             <div style={{color:md.text,fontWeight:900,fontSize:"0.72rem",marginTop:2}}>{Math.round(cell.tot/1000)}k</div>
                             <div style={{color:md.text,opacity:0.65,fontSize:"0.58rem"}}>{Math.round(cell.v1f/1000)}·{Math.round(cell.v2f/1000)}</div>
+                            {hasFlags&&<div style={{fontSize:"0.55rem",marginTop:1,lineHeight:1}}>{cell.flags.map((f,i)=><span key={i}>{f.icon}</span>)}</div>}
                           </div>
                         </td>
                       );
@@ -949,7 +1003,7 @@ function App(){
         {/* SIDOPANEL */}
         <div className="mob-sidepanel" style={{width:210,flexShrink:0}}>
           <div style={{fontFamily:"'Fredoka One',cursive",color:"#fbbf24",fontSize:"1rem",marginBottom:12}}>🔒 Sidoposter</div>
-          {[{title:"Innan skatt",color:"#7bb3e0",rows:[lon1.length>0&&["V1 Lön","43 700 kr (heltid)"],lon2.length>0&&["V2 Lön","50 100 kr (heltid)"]].filter(Boolean)},
+          {[{title:"Lön (efter skatt)",color:"#7bb3e0",rows:[lon1.length>0&&["V1 Heltid",lon1Heltid.toLocaleString("sv-SE")+" kr"],lon2.length>0&&["V2 Heltid",lon2Heltid.toLocaleString("sv-SE")+" kr"]].filter(Boolean)},
             {title:"Pension/mån",color:"#c084fc",rows:[lon1.length>0&&["V1 Statlig","7 519 kr"],lon1.length>0&&["V1 Tjänste","1 967 kr"],lon2.length>0&&["V2 Statlig","8 620 kr"],lon2.length>0&&["V2 Tjänste","2 886 kr"]].filter(Boolean)}
           ].map(({title,color,rows})=>(
             <div key={title} style={{background:"#0e0d1e",border:"2px solid #1e1840",borderRadius:14,padding:"12px 14px",marginBottom:12}}>
@@ -983,6 +1037,15 @@ function App(){
             {isMobile&&<button onClick={()=>setTapped(null)} style={{background:"#ffffff10",border:"none",color:"#c084fc",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontSize:"0.82rem"}}>✕</button>}
           </div>
 
+          {cell.flags&&cell.flags.length>0&&<div style={{background:"#1a1040",border:"1px solid #c084fc44",borderRadius:10,padding:"8px 10px",marginBottom:10}}>
+            <div style={{fontSize:"0.68rem",color:"#f0abfc",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>📌 Händelser</div>
+            {cell.flags.map((f,i)=>(
+              <div key={i} style={{fontSize:"0.76rem",color:"#e0cfff",marginBottom:2}}>
+                {f.icon} {f.text}
+              </div>
+            ))}
+          </div>}
+
           {Object.keys(cell.gi).length>0&&<React.Fragment>
             <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Inkomster</div>
             {Object.entries(cell.gi).map(([k,v])=>(
@@ -997,40 +1060,34 @@ function App(){
             </div>
           </React.Fragment>}
 
-          {(Object.keys(cell.gc1).length>0||Object.keys(cell.gc2).length>0)&&(()=>{
-            const merged={};
-            Object.entries(cell.gc1).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
-            Object.entries(cell.gc2).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
+          {(()=>{
+            const allCosts={};
+            Object.entries(cell.gc1).forEach(([k,v])=>{allCosts[k]=(allCosts[k]||0)+v;});
+            Object.entries(cell.gc2).forEach(([k,v])=>{allCosts[k]=(allCosts[k]||0)+v;});
+            Object.entries(cell.gsh).forEach(([k,v])=>{allCosts[k]=(allCosts[k]||0)+v;});
+            const entries=Object.entries(allCosts);
+            if(entries.length===0)return null;
+            const totalCost=cell.v1c+cell.v2c+cell.sh;
             return(<React.Fragment>
-              <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Individuella utgifter</div>
-              {Object.entries(merged).map(([k,v])=>(
+              <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+                Utgifter ({Math.round(cell.v1share*100)}% V1 / {Math.round(cell.v2share*100)}% V2)
+              </div>
+              {entries.map(([k,v])=>(
                 <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
                   <span style={{color:"#f9a8d4"}}>{k}</span>
                   <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
                 </div>
               ))}
-              <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
-                <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa individuella</span>
-                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(cell.v1c+cell.v2c)}</span>
+              <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4,borderTop:"1px solid #1e1840",paddingTop:6,marginTop:2}}>
+                <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa utgifter</span>
+                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(totalCost)}</span>
+              </div>
+              <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6}}>
+                <span style={{color:"#9980cc",fontStyle:"italic"}}>V1 betalar / V2 betalar</span>
+                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(cell.v1c+cell.sh*cell.v1share)} / –{fmt(cell.v2c+cell.sh*cell.v2share)}</span>
               </div>
             </React.Fragment>);
           })()}
-
-          {Object.keys(cell.gsh).length>0&&<React.Fragment>
-            <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
-              Delade utgifter ({Math.round(cell.v1share*100)}% V1 / {Math.round(cell.v2share*100)}% V2)
-            </div>
-            {Object.entries(cell.gsh).map(([k,v])=>(
-              <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
-                <span style={{color:"#f9a8d4"}}>{k}</span>
-                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
-              </div>
-            ))}
-            <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
-              <span style={{color:"#9980cc",fontStyle:"italic"}}>V1 betalar / V2 betalar</span>
-              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(cell.sh*cell.v1share)} / –{fmt(cell.sh*cell.v2share)}</span>
-            </div>
-          </React.Fragment>}
 
           <div style={{display:"flex",flexDirection:"column",gap:5}}>
             <div style={{display:"flex",justifyContent:"space-between"}}>
