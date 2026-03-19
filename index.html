@@ -23,10 +23,70 @@ select option{background:#12102a;}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
 .cell:hover{transform:scale(1.12)!important;}
 .save-indicator{position:fixed;bottom:20px;right:20px;z-index:10000;font-family:'Nunito',sans-serif;font-size:0.82rem;padding:10px 20px;border-radius:14px;pointer-events:none;transition:all 0.4s ease;}
+#login-gate{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Nunito',sans-serif;}
+#login-gate .box{background:#160e28;border:2px solid #c084fc66;border-radius:22px;padding:36px 40px;max-width:380px;width:90%;box-shadow:0 12px 60px #c084fc33;text-align:center;}
+#login-gate h2{font-family:'Fredoka One',cursive;font-size:2rem;background:linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
+#login-gate p{color:#7766aa;font-size:0.82rem;margin-bottom:20px;}
+#login-gate input{background:#12102a;border:2px solid #c084fc44;color:#e0cfff;font-family:'Nunito',sans-serif;font-size:1rem;padding:10px 16px;border-radius:12px;outline:none;width:100%;margin-bottom:12px;text-align:center;}
+#login-gate input:focus{border-color:#c084fc;}
+#login-gate button{padding:10px 28px;border-radius:16px;border:none;cursor:pointer;font-family:'Fredoka One',cursive;font-size:1rem;background:linear-gradient(135deg,#c084fc,#f472b6);color:#fff;box-shadow:0 4px 20px #c084fc55;width:100%;transition:transform 0.15s;}
+#login-gate button:hover{transform:scale(1.03);}
+#login-gate .error{color:#fca5a5;font-size:0.78rem;margin-top:8px;}
+#app-content{display:none;}
 </style>
 </head>
 <body>
-<div id="root"></div>
+
+<!-- PASSWORD GATE -->
+<div id="login-gate">
+  <div class="box">
+    <div style="font-size:3rem;margin-bottom:10px;animation:float 3s ease-in-out infinite">🔒</div>
+    <h2>Familjens Pengakarta</h2>
+    <p>Skriv lösenordet för att komma in!</p>
+    <input type="password" id="pw-input" placeholder="Lösenord..." autofocus/>
+    <button onclick="tryLogin()">Lås upp 🔑</button>
+    <div id="pw-error" class="error"></div>
+  </div>
+</div>
+
+<div id="app-content">
+  <div id="root"></div>
+</div>
+
+<script>
+const HASH="48dca0ec213ea0e913a2882e54654c98916332cbfb58815e29c8f12fea2229a1";
+const SESSION_KEY="pengakarta_auth";
+
+async function sha256(msg){
+  const buf=await crypto.subtle.digest("SHA-256",new TextEncoder().encode(msg));
+  return Array.from(new Uint8Array(buf)).map(b=>b.toString(16).padStart(2,"0")).join("");
+}
+
+async function tryLogin(){
+  const pw=document.getElementById("pw-input").value;
+  const h=await sha256(pw);
+  if(h===HASH){
+    sessionStorage.setItem(SESSION_KEY,"1");
+    unlock();
+  } else {
+    document.getElementById("pw-error").textContent="❌ Fel lösenord – försök igen!";
+    document.getElementById("pw-input").value="";
+    document.getElementById("pw-input").focus();
+  }
+}
+
+function unlock(){
+  document.getElementById("login-gate").style.display="none";
+  document.getElementById("app-content").style.display="block";
+}
+
+// Auto-unlock if already authenticated this session
+if(sessionStorage.getItem(SESSION_KEY)==="1") unlock();
+
+// Enter key to submit
+document.getElementById("pw-input").addEventListener("keydown",e=>{if(e.key==="Enter")tryLogin();});
+</script>
+
 <script type="text/babel">
 const {useState,useCallback,useMemo,useEffect,useRef}=React;
 
