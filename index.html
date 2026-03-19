@@ -23,8 +23,37 @@ select option{background:#12102a;}
 @keyframes float{0%,100%{transform:translateY(0)}50%{transform:translateY(-5px)}}
 @keyframes spin{0%{transform:rotate(0deg)}100%{transform:rotate(360deg)}}
 @keyframes pulse{0%,100%{opacity:1}50%{opacity:0.5}}
+@keyframes slideUp{0%{transform:translateY(100%);opacity:0}100%{transform:translateY(0);opacity:1}}
 .cell:hover{transform:scale(1.12)!important;}
 .save-indicator{position:fixed;bottom:20px;right:20px;z-index:10000;font-family:'Nunito',sans-serif;font-size:0.82rem;padding:10px 20px;border-radius:14px;pointer-events:none;transition:all 0.4s ease;}
+
+/* Mobile overrides */
+@media(max-width:680px){
+  .cell:hover{transform:none!important;}
+  .mob-header-title{font-size:1.5rem!important;}
+  .mob-header-sub{font-size:0.72rem!important;}
+  .mob-header-icon{font-size:2rem!important;}
+  .mob-header{padding:16px 16px 12px!important;}
+  .mob-content{padding:14px 14px!important;}
+  .mob-tab{font-size:0.78rem!important;padding:7px 12px!important;}
+  .mob-section-title{font-size:1.3rem!important;}
+  .mob-grid{grid-template-columns:1fr!important;}
+  .mob-toolbar{gap:4px!important;}
+  .mob-toolbar button{padding:6px 8px!important;font-size:0.68rem!important;}
+  .mob-table-wrap{margin:0 -14px;padding:0 14px;}
+  .mob-table td,.mob-table th{min-width:44px!important;}
+  .mob-table .cell{min-width:44px!important;border-radius:8px!important;padding:4px 2px!important;}
+  .mob-table .cell div:first-child{font-size:0.9rem!important;}
+  .mob-table .cell div:nth-child(2){font-size:0.64rem!important;}
+  .mob-table .cell div:nth-child(3){display:none!important;}
+  .mob-table th{padding:4px 2px!important;font-size:0.64rem!important;min-width:44px!important;}
+  .mob-table td:first-child,.mob-table th:first-child{position:sticky;left:0;z-index:2;padding:4px 8px!important;}
+  .mob-sidepanel{width:100%!important;flex-shrink:unset!important;}
+  .mob-flex-col{flex-direction:column!important;}
+  .save-indicator{bottom:50px;right:10px;font-size:0.74rem;padding:8px 14px;}
+  .mob-bottom-sheet{position:fixed;bottom:0;left:0;right:0;z-index:9999;background:linear-gradient(135deg,#180e2e,#0e0d20);border-top:2px solid #c084fc99;border-radius:22px 22px 0 0;padding:20px;max-height:70vh;overflow-y:auto;box-shadow:0 -8px 40px #c084fc55;animation:slideUp 0.25s ease;}
+  .mob-bottom-sheet-overlay{position:fixed;inset:0;background:#000000aa;z-index:9998;}
+}
 #login-gate{display:flex;align-items:center;justify-content:center;min-height:100vh;font-family:'Nunito',sans-serif;}
 #login-gate .box{background:#160e28;border:2px solid #c084fc66;border-radius:22px;padding:36px 40px;max-width:380px;width:90%;box-shadow:0 12px 60px #c084fc33;text-align:center;}
 #login-gate h2{font-family:'Fredoka One',cursive;font-size:2rem;background:linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24);-webkit-background-clip:text;-webkit-text-fill-color:transparent;margin-bottom:6px;}
@@ -228,7 +257,9 @@ function App(){
   const[fp2,setFp2]=useState(DEFAULT_STATE.fp2);
   const[hover,setHover]=useState(null);
   const[ttxy,setTtxy]=useState({x:0,y:0});
+  const[tapped,setTapped]=useState(null);
   const[tab,setTab]=useState("tabell");
+  const isMobile=typeof window!=="undefined"&&window.innerWidth<=680;
   const[saveMsg,setSaveMsg]=useState(null);
   const[showShareModal,setShowShareModal]=useState(false);
   const[shareUrl,setShareUrl]=useState("");
@@ -546,34 +577,34 @@ function App(){
     )}
 
     {/* HEADER */}
-    <div style={{padding:"28px 32px 18px",background:"linear-gradient(180deg,#140e28 0%,#08070f 100%)",borderBottom:"2px solid #1e1840"}}>
-      <div style={{display:"flex",alignItems:"center",gap:14,marginBottom:18,flexWrap:"wrap"}}>
-        <span style={{fontSize:"3rem",animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🏠</span>
-        <div style={{flex:1}}>
-          <h1 style={{fontFamily:"'Fredoka One',cursive",fontSize:"2.6rem",background:"linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"0.02em"}}>Familjens Pengakarta!</h1>
-          <div style={{color:"#7766aa",fontSize:"0.82rem",marginTop:2}}>2026 → 2033 · Utforska, klicka, och ha kul! 🎉</div>
+    <div className="mob-header" style={{padding:"28px 32px 18px",background:"linear-gradient(180deg,#140e28 0%,#08070f 100%)",borderBottom:"2px solid #1e1840"}}>
+      <div style={{display:"flex",alignItems:"center",gap:isMobile?10:14,marginBottom:isMobile?12:18,flexWrap:"wrap"}}>
+        <span className="mob-header-icon" style={{fontSize:"3rem",animation:"float 3s ease-in-out infinite",display:"inline-block"}}>🏠</span>
+        <div style={{flex:1,minWidth:0}}>
+          <h1 className="mob-header-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"2.6rem",background:"linear-gradient(90deg,#f0abfc,#fb7185,#fbbf24)",WebkitBackgroundClip:"text",WebkitTextFillColor:"transparent",letterSpacing:"0.02em"}}>Familjens Pengakarta!</h1>
+          <div className="mob-header-sub" style={{color:"#7766aa",fontSize:"0.82rem",marginTop:2}}>2026 → 2033 · Utforska, klicka, och ha kul! 🎉</div>
         </div>
-        <div style={{display:"flex",gap:8,flexWrap:"wrap"}}>
-          <button onClick={handleShare} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Dela med andra">🔗 Dela</button>
-          <button onClick={handleExport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Ladda ner backup">💾 Exportera</button>
-          <button onClick={handleImport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Importera backup">📂 Importera</button>
-          <button onClick={handleReset} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #f472b644",background:"#1a0a12",color:"#f472b6",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Nollställ allt">🧹 Nollställ</button>
+        <div className="mob-toolbar" style={{display:"flex",gap:8,flexWrap:"wrap"}}>
+          <button onClick={handleShare} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Dela med andra">{isMobile?"🔗":"🔗 Dela"}</button>
+          <button onClick={handleExport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Ladda ner backup">{isMobile?"💾":"💾 Exportera"}</button>
+          <button onClick={handleImport} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #c084fc44",background:"#12102a",color:"#c084fc",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Importera backup">{isMobile?"📂":"📂 Importera"}</button>
+          <button onClick={handleReset} style={{padding:"8px 16px",borderRadius:14,border:"2px solid #f472b644",background:"#1a0a12",color:"#f472b6",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",cursor:"pointer",fontWeight:700}} title="Nollställ allt">{isMobile?"🧹":"🧹 Nollställ"}</button>
         </div>
       </div>
       <div style={{display:"flex",gap:6,flexWrap:"wrap"}}>
         {[["tabell","📊 Månadskartan"],["inkomster","💸 Pengar in"],["utgifter","🛒 Pengar ut"],["fp","🍼 Föräldrapenning"]].map(([k,v])=>(
-          <button key={k} style={tabStyle(tab===k)} onClick={()=>setTab(k)}>{v}</button>
+          <button key={k} className="mob-tab" style={tabStyle(tab===k)} onClick={()=>setTab(k)}>{isMobile?v.split(" ").slice(0,2).join(" "):v}</button>
         ))}
       </div>
     </div>
 
-    <div style={{padding:"26px 32px"}}>
+    <div className="mob-content" style={{padding:"26px 32px"}}>
 
     {/* ── PENGAR IN ── */}
     {tab==="inkomster"&&(
       <div>
-        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>💸 Pengar som ramlar in</h2>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+        <h2 className="mob-section-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>💸 Pengar som ramlar in</h2>
+        <div className="mob-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
           {[{n:1,lon:lon1,addL:()=>addLon(1),rmL:(id)=>rmLon(1,id),upL:(id,f,v)=>upLon(1,id,f,v),heltid:"34 219",pension:"9 485"},
             {n:2,lon:lon2,addL:()=>addLon(2),rmL:(id)=>rmLon(2,id),upL:(id,f,v)=>upLon(2,id,f,v),heltid:"38 269",pension:"11 505"}
           ].map(({n,lon,addL,rmL,upL,heltid,pension})=>(
@@ -675,8 +706,8 @@ function App(){
     {/* ── PENGAR UT ── */}
     {tab==="utgifter"&&(
       <div>
-        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>🛒 Pengar som flyger iväg</h2>
-        <div style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+        <h2 className="mob-section-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:20}}>🛒 Pengar som flyger iväg</h2>
+        <div className="mob-grid" style={{display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
           {[{n:1,on:b1on,tog:setB1on,y:b1y,m:b1m,sy:setB1y,sm:setB1m,e:"👶"},{n:2,on:b2on,tog:setB2on,y:b2y,m:b2m,sy:setB2y,sm:setB2m,e:"🍼"}].map(({n,on,tog,y,m,sy,sm,e})=>(
             <Card key={n} on={on}>
               <Pill on={on} onClick={()=>tog(!on)} label={"Barn "+n} emoji={e}/>
@@ -704,7 +735,7 @@ function App(){
           </Card>
         </div>
 
-        <div style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
+        <div className="mob-grid" style={{marginTop:16,display:"grid",gridTemplateColumns:"repeat(auto-fill,minmax(300px,1fr))",gap:16}}>
           <Card on={true}>
             <div style={{fontFamily:"'Fredoka One',cursive",color:"#818cf8",fontSize:"1.1rem",marginBottom:12}}>🏦 Privat pensionssparande (vid FL)</div>
             <div className="row">
@@ -795,7 +826,7 @@ function App(){
       };
       return(
       <div>
-        <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:12}}>🍼 Föräldrapenning</h2>
+        <h2 className="mob-section-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:12}}>🍼 Föräldrapenning</h2>
         <div style={{background:"#160e28",border:"2px solid #c084fc44",borderRadius:18,padding:"16px 20px",marginBottom:20,fontSize:"0.82rem",lineHeight:1.8}}>
           <div style={{fontFamily:"'Fredoka One',cursive",color:"#f0abfc",fontSize:"1.1rem",marginBottom:6}}>📋 Reglerna i korthet</div>
           <div>480 dagar per barn · 90 dagar låsta per vuxen · upp till 30 dubbeldagar</div>
@@ -873,12 +904,12 @@ function App(){
 
     {/* ── TABELL ── */}
     {tab==="tabell"&&(
-      <div style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"flex-start"}}>
+      <div className="mob-flex-col" style={{display:"flex",gap:24,flexWrap:"wrap",alignItems:"flex-start"}}>
         <div style={{flex:1,minWidth:0}}>
-          <h2 style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:6}}>📊 Månadskartan</h2>
-          <p style={{color:"#7766aa",fontSize:"0.8rem",marginBottom:18}}>Håll muspekaren över en månad för detaljer 🔍  ·  Siffror i tusental (k)</p>
-          <div style={{overflowX:"auto"}}>
-            <table style={{borderCollapse:"separate",borderSpacing:"4px 4px"}}>
+          <h2 className="mob-section-title" style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.9rem",color:"#f0abfc",marginBottom:6}}>📊 Månadskartan</h2>
+          <p style={{color:"#7766aa",fontSize:"0.8rem",marginBottom:18}}>{isMobile?"Tryck på en månad för detaljer 👆":"Håll muspekaren över en månad för detaljer 🔍"}  ·  Siffror i tusental (k)</p>
+          <div className="mob-table-wrap" style={{overflowX:"auto",WebkitOverflowScrolling:"touch"}}>
+            <table className="mob-table" style={{borderCollapse:"separate",borderSpacing:isMobile?"2px 2px":"4px 4px"}}>
               <thead>
                 <tr>
                   <th style={{background:"#160e28",color:"#c084fc",padding:"8px 14px",borderRadius:10,fontFamily:"'Fredoka One',cursive",fontSize:"0.85rem"}}>År</th>
@@ -894,7 +925,8 @@ function App(){
                       return(
                         <td key={cell.month} style={{padding:0}}>
                           <div className="cell"
-                            onMouseEnter={e=>onEnt(cell,e)} onMouseLeave={onLv}
+                            onClick={()=>isMobile&&setTapped(tapped&&tapped.mi===cell.mi?null:cell)}
+                            onMouseEnter={e=>!isMobile&&onEnt(cell,e)} onMouseLeave={()=>!isMobile&&onLv()}
                             style={{background:md.bg,border:"2px solid "+md.border,borderRadius:12,padding:"5px 3px",textAlign:"center",cursor:"pointer",transition:"transform 0.15s, box-shadow 0.15s",minWidth:60}}>
                             <div style={{fontSize:"1.1rem",lineHeight:1}}>{md.emoji}</div>
                             <div style={{color:md.text,fontWeight:900,fontSize:"0.72rem",marginTop:2}}>{Math.round(cell.tot/1000)}k</div>
@@ -908,14 +940,14 @@ function App(){
               </tbody>
             </table>
           </div>
-          <div style={{marginTop:14,display:"flex",gap:12,flexWrap:"wrap",fontSize:"0.74rem"}}>
-            {MOODS.map(m=><span key={m.emoji} style={{color:m.text,background:m.bg,border:"1px solid "+m.border,borderRadius:8,padding:"3px 10px"}}>{m.emoji} {m.label}</span>)}
+          <div style={{marginTop:14,display:"flex",gap:isMobile?6:12,flexWrap:"wrap",fontSize:"0.74rem"}}>
+            {MOODS.map(m=><span key={m.emoji} style={{color:m.text,background:m.bg,border:"1px solid "+m.border,borderRadius:8,padding:"3px 10px"}}>{m.emoji} {isMobile?"":m.label}</span>)}
           </div>
           <div style={{marginTop:8,fontSize:"0.66rem",color:"#443366"}}>Totalt / V1 · V2</div>
         </div>
 
         {/* SIDOPANEL */}
-        <div style={{width:210,flexShrink:0}}>
+        <div className="mob-sidepanel" style={{width:210,flexShrink:0}}>
           <div style={{fontFamily:"'Fredoka One',cursive",color:"#fbbf24",fontSize:"1rem",marginBottom:12}}>🔒 Sidoposter</div>
           {[{title:"Innan skatt",color:"#7bb3e0",rows:[lon1.length>0&&["V1 Lön","43 700 kr (heltid)"],lon2.length>0&&["V2 Lön","50 100 kr (heltid)"]].filter(Boolean)},
             {title:"Pension/mån",color:"#c084fc",rows:[lon1.length>0&&["V1 Statlig","7 519 kr"],lon1.length>0&&["V1 Tjänste","1 967 kr"],lon2.length>0&&["V2 Statlig","8 620 kr"],lon2.length>0&&["V2 Tjänste","2 886 kr"]].filter(Boolean)}
@@ -940,78 +972,95 @@ function App(){
 
     </div>
 
-    {/* TOOLTIP */}
-    {hover&&(
-      <div style={{position:"fixed",left:Math.min(ttxy.x+16,window.innerWidth-340),top:Math.min(ttxy.y-10,window.innerHeight-400),background:"linear-gradient(135deg,#180e2e,#0e0d20)",border:"2px solid #c084fc99",borderRadius:18,padding:"16px 20px",maxWidth:320,zIndex:9999,pointerEvents:"none",boxShadow:"0 8px 40px #c084fc55",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",animation:"pop 0.15s ease"}}>
-        <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:10,borderBottom:"1px solid #2a1a4a",paddingBottom:6}}>
-          {mood(hover.tot).emoji} {MONTHS[hover.month-1]} {hover.year}
-        </div>
-
-        {Object.keys(hover.gi).length>0&&<React.Fragment>
-          <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Inkomster</div>
-          {Object.entries(hover.gi).map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
-              <span style={{color:"#c4b5fd"}}>{k}</span>
-              <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(v)}</span>
-            </div>
-          ))}
-          <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
-            <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa inkomster</span>
-            <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(hover.v1i+hover.v2i)}</span>
+    {/* DETAIL VIEW — desktop tooltip (hover) or mobile bottom sheet (tap) */}
+    {(()=>{
+      const cell=isMobile?tapped:hover;
+      if(!cell)return null;
+      const content=(
+        <React.Fragment>
+          <div style={{fontFamily:"'Fredoka One',cursive",fontSize:"1.15rem",color:"#f0abfc",marginBottom:10,borderBottom:"1px solid #2a1a4a",paddingBottom:6,display:"flex",justifyContent:"space-between",alignItems:"center"}}>
+            <span>{mood(cell.tot).emoji} {MONTHS[cell.month-1]} {cell.year}</span>
+            {isMobile&&<button onClick={()=>setTapped(null)} style={{background:"#ffffff10",border:"none",color:"#c084fc",borderRadius:8,padding:"4px 12px",cursor:"pointer",fontFamily:"'Nunito',sans-serif",fontSize:"0.82rem"}}>✕</button>}
           </div>
-        </React.Fragment>}
 
-        {(Object.keys(hover.gc1).length>0||Object.keys(hover.gc2).length>0)&&(()=>{
-          const merged={};
-          Object.entries(hover.gc1).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
-          Object.entries(hover.gc2).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
-          return(<React.Fragment>
-            <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Individuella utgifter</div>
-            {Object.entries(merged).map(([k,v])=>(
+          {Object.keys(cell.gi).length>0&&<React.Fragment>
+            <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Inkomster</div>
+            {Object.entries(cell.gi).map(([k,v])=>(
+              <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
+                <span style={{color:"#c4b5fd"}}>{k}</span>
+                <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(v)}</span>
+              </div>
+            ))}
+            <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
+              <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa inkomster</span>
+              <span style={{fontWeight:700,color:"#a7f3c0",whiteSpace:"nowrap"}}>+{fmt(cell.v1i+cell.v2i)}</span>
+            </div>
+          </React.Fragment>}
+
+          {(Object.keys(cell.gc1).length>0||Object.keys(cell.gc2).length>0)&&(()=>{
+            const merged={};
+            Object.entries(cell.gc1).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
+            Object.entries(cell.gc2).forEach(([k,v])=>{merged[k]=(merged[k]||0)+v;});
+            return(<React.Fragment>
+              <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>Individuella utgifter</div>
+              {Object.entries(merged).map(([k,v])=>(
+                <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
+                  <span style={{color:"#f9a8d4"}}>{k}</span>
+                  <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
+                </div>
+              ))}
+              <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
+                <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa individuella</span>
+                <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(cell.v1c+cell.v2c)}</span>
+              </div>
+            </React.Fragment>);
+          })()}
+
+          {Object.keys(cell.gsh).length>0&&<React.Fragment>
+            <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
+              Delade utgifter ({Math.round(cell.v1share*100)}% V1 / {Math.round(cell.v2share*100)}% V2)
+            </div>
+            {Object.entries(cell.gsh).map(([k,v])=>(
               <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
                 <span style={{color:"#f9a8d4"}}>{k}</span>
                 <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
               </div>
             ))}
             <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
-              <span style={{color:"#9980cc",fontStyle:"italic"}}>Summa individuella</span>
-              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(hover.v1c+hover.v2c)}</span>
+              <span style={{color:"#9980cc",fontStyle:"italic"}}>V1 betalar / V2 betalar</span>
+              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(cell.sh*cell.v1share)} / –{fmt(cell.sh*cell.v2share)}</span>
             </div>
-          </React.Fragment>);
-        })()}
+          </React.Fragment>}
 
-        {Object.keys(hover.gsh).length>0&&<React.Fragment>
-          <div style={{fontSize:"0.68rem",color:"#6655aa",textTransform:"uppercase",letterSpacing:"0.06em",marginBottom:4}}>
-            Delade utgifter ({Math.round(hover.v1share*100)}% V1 / {Math.round(hover.v2share*100)}% V2)
-          </div>
-          {Object.entries(hover.gsh).map(([k,v])=>(
-            <div key={k} style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:4}}>
-              <span style={{color:"#f9a8d4"}}>{k}</span>
-              <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(v)}</span>
+          <div style={{display:"flex",flexDirection:"column",gap:5}}>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"#9980cc"}}>👩 V1 kvar</span>
+              <span style={{fontWeight:700,color:cell.v1f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(cell.v1f)}</span>
             </div>
-          ))}
-          <div style={{display:"flex",justifyContent:"space-between",gap:14,marginBottom:8,borderBottom:"1px solid #1e1840",paddingBottom:6,marginTop:2}}>
-            <span style={{color:"#9980cc",fontStyle:"italic"}}>V1 betalar / V2 betalar</span>
-            <span style={{fontWeight:700,color:"#fca5a5",whiteSpace:"nowrap"}}>–{fmt(hover.sh*hover.v1share)} / –{fmt(hover.sh*hover.v2share)}</span>
+            <div style={{display:"flex",justifyContent:"space-between"}}>
+              <span style={{color:"#9980cc"}}>👨 V2 kvar</span>
+              <span style={{fontWeight:700,color:cell.v2f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(cell.v2f)}</span>
+            </div>
+            <div style={{display:"flex",justifyContent:"space-between",background:"#ffffff0a",borderRadius:10,padding:"7px 10px",marginTop:4}}>
+              <span style={{color:"#f0abfc",fontFamily:"'Fredoka One',cursive"}}>Totalt kvar</span>
+              <span style={{color:cell.tot>=0?"#a7f3c0":"#fca5a5",fontFamily:"'Fredoka One',cursive",fontSize:"1.05rem"}}>{fmt(cell.tot)}</span>
+            </div>
           </div>
-        </React.Fragment>}
+        </React.Fragment>
+      );
 
-        <div style={{display:"flex",flexDirection:"column",gap:5}}>
-          <div style={{display:"flex",justifyContent:"space-between"}}>
-            <span style={{color:"#9980cc"}}>👩 V1 kvar</span>
-            <span style={{fontWeight:700,color:hover.v1f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(hover.v1f)}</span>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between"}}>
-            <span style={{color:"#9980cc"}}>👨 V2 kvar</span>
-            <span style={{fontWeight:700,color:hover.v2f>=0?"#a7f3c0":"#fca5a5"}}>{fmt(hover.v2f)}</span>
-          </div>
-          <div style={{display:"flex",justifyContent:"space-between",background:"#ffffff0a",borderRadius:10,padding:"7px 10px",marginTop:4}}>
-            <span style={{color:"#f0abfc",fontFamily:"'Fredoka One',cursive"}}>Totalt kvar</span>
-            <span style={{color:hover.tot>=0?"#a7f3c0":"#fca5a5",fontFamily:"'Fredoka One',cursive",fontSize:"1.05rem"}}>{fmt(hover.tot)}</span>
-          </div>
+      if(isMobile){
+        return(<React.Fragment>
+          <div className="mob-bottom-sheet-overlay" onClick={()=>setTapped(null)}/>
+          <div className="mob-bottom-sheet" style={{fontFamily:"'Nunito',sans-serif",fontSize:"0.82rem"}}>{content}</div>
+        </React.Fragment>);
+      }
+      return(
+        <div style={{position:"fixed",left:Math.min(ttxy.x+16,window.innerWidth-340),top:Math.min(ttxy.y-10,window.innerHeight-400),background:"linear-gradient(135deg,#180e2e,#0e0d20)",border:"2px solid #c084fc99",borderRadius:18,padding:"16px 20px",maxWidth:320,zIndex:9999,pointerEvents:"none",boxShadow:"0 8px 40px #c084fc55",fontFamily:"'Nunito',sans-serif",fontSize:"0.78rem",animation:"pop 0.15s ease"}}>
+          {content}
         </div>
-      </div>
-    )}
+      );
+    })()}
 
     </React.Fragment>}
   </div>
